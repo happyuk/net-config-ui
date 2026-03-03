@@ -1,0 +1,9 @@
+crypto ikev2 profile DVR_DMVPN_Cert_Profile
+ match fvrf any
+ match identity remote fqdn domain dc2e.mnd.r.mil.uk
+ identity local fqdn N{{ node_number }}{{ domain }}002DVR001.DVR.dc2e.mnd.r.mil.uk
+ authentication remote rsa-sig
+ authentication local rsa-sig
+ pki trustpoint DVR
+ dpd 10 5 periodic
+!

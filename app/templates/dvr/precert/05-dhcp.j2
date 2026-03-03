@@ -1,0 +1,12 @@
+! DHCP configuration for VOICE VRF (101): excluded range + pool 101
+
+ip dhcp excluded-address vrf 101 10.15.{{ node_number }}.0 10.15.{{ node_number }}.10
+
+ip dhcp pool 101
+ vrf 101
+ network 10.15.{{ node_number }}.0 255.255.255.0
+ default-router 10.15.{{ node_number }}.1
+ dns-server 10.15.{{ node_number }}.1
+ ! NOTE: Verify this is not a typo; other places use ".mil.uk" not ".mtl.uk".
+ domain-name n{{ node_number }}.dc2e.mnd.r.mil.uk
+ option 150 ip 10.15.{{ node_number }}.5

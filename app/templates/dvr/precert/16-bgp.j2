@@ -1,0 +1,33 @@
+! BGP configuration (VRF + VPNv4/v6)
+
+router bgp 6400.0
+ bgp router-id interface Loopback123
+ bgp asnotation dot
+ bgp log-neighbor-changes
+ bgp bestpath as-path multipath-relax
+ no bgp default ipv4-unicast
+ no bgp default ipv6-nexthop
+ no bgp default route-target filter
+
+ neighbor 123.123.0.129 remote-as 6400.10
+ neighbor 123.123.0.129 password *R0ut3R_3Nr0L_P@$s*
+ neighbor 123.123.0.129 update-source Tunnel9999
+ neighbor 123.123.0.129 fall-over bfd single-hop strict-mode
+
+ address-family vpnv4
+  neighbor 123.123.0.129 activate
+  neighbor 123.123.0.129 send-community both
+ exit-address-family
+
+ address-family vpnv6
+  neighbor 123.123.0.129 activate
+  neighbor 123.123.0.129 send-community both
+ exit-address-family
+
+ address-family ipv4 vrf 100
+  redistribute connected
+ exit-address-family
+
+ address-family ipv6 vrf 100
+  redistribute connected
+ exit-address-family

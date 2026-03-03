@@ -1,0 +1,30 @@
+! IKEv2 proposal, policy, keyring and profile
+
+crypto ikev2 proposal DVR_DMVPN_Proposal
+ encryption aes-cbc-256
+ integrity sha256
+ group 14
+
+crypto ikev2 policy DVR_DMVPN_Policy
+ match fvrf any
+ proposal DVR_DMVPN_Proposal
+no crypto ikev2 policy default
+no crypto ikev2 proposal default
+
+crypto ikev2 keyring DVR_DMVPN_Keyring
+ peer Node_Enrol_Key
+  address 0.0.0.0 0.0.0.0
+  identity address 2A08:605:3:999::{{ node_number }}
+ pre-shared-key local Jz4U7EPkQRa&G{K!fFEw[7e%kBh7f%zsMoX_yc6}^we6Bv6ET1
+ pre-shared-key remote Jz4U7EPkQRa&G{K!ffEw[7e%kBh7f%zsMoX_yc6}^we6Bv6ET1
+
+crypto ikev2 profile DVR_DMVPN_Enrol_Profile
+ match fvrf any
+ match identity remote address 2A08:605:3:999::/64
+ identity local address 2A08:605:3:999::{{ node_number }}
+ authentication remote pre-share
+ authentication local pre-share
+ keyring local DVR_DMVPN_Keyring
+ dpd 10 5 periodic
+
+crypto ikev2 nat keepalive 20

@@ -1,0 +1,21 @@
+interface Tunnel1
+ description DVR Tunnel Interface
+ ip dhcp client broadcast-flag clear
+ ip address dhcp
+ no ip redirects
+ no ip proxy-arp
+ ip mtu 1350
+ ip nhrp authentication *C$1P_!*
+ ip nhrp network-id 800
+ ip nhrp nhs 10.0.0.1 nbma 208.25.1.13 multicast
+ ip nhrp nhs 10.0.0.2 nbma 208.25.1.14 multicast
+ ip nhrp bfd strict-mode
+ mpls bgp forwarding
+ qos pre-classify
+ bfd template Single_Hop_BFD
+ tunnel source GigabitEthernet1
+ tunnel mode gre multipoint
+ tunnel key 800
+ tunnel path-mtu-discovery
+ tunnel protection ipsec profile DVR_DMVPN_Cert_IPsec shared
+!

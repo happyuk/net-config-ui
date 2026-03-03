@@ -1,0 +1,35 @@
+
+! VRF definitions for data (100), voice (101) and management (Mgmt) networks.
+! Includes RD and RT import/export policy for IPv4 and IPv6 AFIs.
+vrf definition 100
+ rd 100:100
+ address-family ipv6
+  route-target export 100:100
+  route-target import 100:100
+ exit-address-family
+ address-family ipv4
+  route-target export 100:100
+  route-target import 100:100
+ exit-address-family
+!
+vrf definition 101
+ rd 101:101
+ address-family ipv4
+  route-target export 101:101
+  route-target import 101:101
+ exit-address-family
+ address-family ipv6
+  route-target export 101:101
+  route-target import 101:101
+ exit-address-family
+!
+vrf definition Mgmt
+ rd 900:900
+ address-family ipv4
+  route-target export 900:900
+  route-target import 900:900
+ exit-address-family
+ address-family ipv6
+  route-target export 900:900
+  route-target import 900:900
+ exit-address-family

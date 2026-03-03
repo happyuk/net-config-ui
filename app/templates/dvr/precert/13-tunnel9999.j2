@@ -1,0 +1,22 @@
+! DMVPN Enrolment Tunnel
+
+interface Tunnel9999
+ description Cert Enrolment Tunnel
+ ip dhcp client broadcast-flag clear
+ ip address dhcp
+ no ip redirects
+ no ip proxy-arp
+ ip mtu 1300
+ ip nhrp authentication *3nR0lT*
+ ip nhrp network-id 999
+ ip nhrp nhs 123.123.0.129 nbma 208.25.1.12 multicast
+ ip nhrp bfd strict-mode
+ ip tcp adjust-mss 1260
+ mpls bgp forwarding
+ qos pre-classify
+ bfd template Single_Hop_BFD
+ tunnel source GigabitEthernet1
+ tunnel mode gre multipoint
+ tunnel key 999
+ tunnel path-mtu-discovery
+ tunnel protection ipsec profile DVR_DMVPN_Enrol_IPsec

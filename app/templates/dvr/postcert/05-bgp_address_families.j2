@@ -1,0 +1,36 @@
+address-family ipv4
+ redistribute connected
+ maximum-paths 2
+ exit-address-family
+!
+
+address-family vpnv4
+ neighbor 10.0.0.1 activate
+ neighbor 10.0.0.1 send-community both
+ neighbor 10.0.0.2 activate
+ neighbor 10.0.0.2 send-community extended
+ Neighbor 123.123.0.129 shutdown
+ maximum-paths 2
+ exit-address-family
+!
+
+address-family vpnv6
+ neighbor 10.0.0.1 activate
+ neighbor 10.0.0.1 send-community both
+ neighbor 10.0.0.2 activate
+ neighbor 10.0.0.2 send-community both
+ Neighbor 123.123.0.129 shutdown
+ exit-address-family
+!
+
+address-family ipv6 vrf 100
+ redistribute connected
+ redistribute static
+ maximum-paths 2
+ exit-address-family
+!
+
+address-family ipv4 vrf 101
+ network 10.15.{{ node_number }}.0 mask 255.255.255.0
+ maximum-paths 2
+ exit-address-family

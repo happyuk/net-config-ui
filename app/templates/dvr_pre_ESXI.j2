@@ -1,0 +1,17 @@
+enable secret {{ secret }}
+
+username {{ username }} priv 15 secret {{ usersecret }}
+!
+line vty 0 15
+ logging synchronous
+ login local
+ transport input ssh
+ exec-timeout 30 0
+!
+end
+license boot level network-advantage addon dna-advantage
+Do wr mem
+!
+show ip interface brief
+!
+reload

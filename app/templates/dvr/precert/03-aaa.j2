@@ -1,0 +1,8 @@
+! AAA configuration (authentication, authorization, session-id)
+
+aaa new-model
+aaa authentication login default local
+aaa authorization console
+aaa authorization exec default local
+aaa authorization commands 15 default local
+aaa session-id common

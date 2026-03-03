@@ -1,0 +1,9 @@
+! SSH + login settings
+
+ip http authentication local
+ip http timeout-policy idle 30 life 180 requests 10
+
+no ip ssh bulk-mode
+ip ssh version 2
+ip ssh time-out 60
+ip ssh authentication-retries 3

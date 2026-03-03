@@ -1,0 +1,9 @@
+! Loopback for timing + NTP configuration
+
+interface Loopback123
+ description time interface
+ vrf forwarding 100
+ ip address 123.123.{{ node_number }}.123 255.255.255.255
+
+ntp source Loopback123
+ntp server vrf 100 123.123.0.123

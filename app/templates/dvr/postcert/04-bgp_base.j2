@@ -1,0 +1,20 @@
+router bgp 6400.0
+ bgp router-id interface Tunnel1
+ bgp asnotation dot
+!
+bgp log-neighbor-changes
+bgp bestpath as-path multipath-relax
+no bgp default ipv4-unicast
+no bgp default ipv6-nexthop
+no bgp default route-target filter
+
+neighbor 10.0.0.1 remote-as 6400.0
+neighbor 10.0.0.1 password *Dnv3n_Sp0k3_P@ss*
+neighbor 10.0.0.1 update-source Tunnel1
+neighbor 10.0.0.1 fall-over bfd single-hop strict-mode
+
+neighbor 10.0.0.2 remote-as 6400.0
+neighbor 10.0.0.2 password *Dnv3n_Sp0k3_P@ss*
+neighbor 10.0.0.2 update-source Tunnel1
+neighbor 10.0.0.2 fall-over bfd single-hop strict-mode
+!

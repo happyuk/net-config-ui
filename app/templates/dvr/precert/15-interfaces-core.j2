@@ -1,0 +1,32 @@
+! Core interface configuration
+
+interface GigabitEthernet1
+ !ip dhcp client client-id ascii
+ !ip address dhcp
+ negotiation auto
+ no mop enabled
+ no mop sysid
+ no shutdown
+!
+interface GigabitEthernet2
+ no ip address
+ negotiation auto
+ no mop enabled
+ no mop sysid
+ no shutdown
+!
+interface GigabitEthernet2.101
+ encapsulation dot1Q 101
+ vrf forwarding 101
+ ip address 10.15.{{ node_number }}.1 255.255.255.0
+ ip dns view-group VOICE
+!
+interface GigabitEthernet3
+ description Management
+ vrf forwarding 100
+ no ip address
+ negotiation auto
+ ipv6 address 2A08:605:3:{{ node_number }}::1/46
+ no mop enabled
+ no mop sysid
+ no shutdown

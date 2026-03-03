@@ -1,0 +1,13 @@
+ip dns view vrf 101 VOICE
+ domain name-server vrf 101 10.15.{{ node_number }}.1
+ dns forwarder vrf 101 10.15.{{ node_number }}.1
+ dns forwarding source-interface GigabitEthernet2.101
+
+ip dns view-list VOICE
+ view vrf 101 VOICE 1
+ ip dns server view-group VOICE
+ip dns server
+!
+
+ipv6 route vrf 100 2A08:605:3:A{{ node_number }}::/64 2A08:605:3:{{ node_number }}::3
+ipv6 route vrf 100 2A08:605:3:B{{ node_number }}::/64 2A08:605:3:{{ node_number }}::3

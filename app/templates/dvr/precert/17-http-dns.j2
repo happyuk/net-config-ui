@@ -1,0 +1,17 @@
+! HTTP + DNS config
+
+ip http server
+ip http session-module-list http-module-list SCEP
+ip http client source-interface GigabitEthernet2
+ip http secure-server
+
+ip dns view vrf 101 VOICE
+ domain name-server vrf 101 10.15.{{ node_number }}.1
+ dns forwarder vrf 101 10.15.{{ node_number }}.1
+ dns forwarding source-interface GigabitEthernet2.101
+
+ip dns view-list VOICE
+ view vrf 101 VOICE 1
+
+ip dns server view-group VOICE
+ip dns server

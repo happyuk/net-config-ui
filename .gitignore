@@ -1,0 +1,117 @@
+##############################
+# PYTHON
+##############################
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.env/
+.venv/
+env/
+
+# Python packaging / build artefacts
+build/
+dist/
+*.egg-info/
+*.egg
+*.whl
+pip-wheel-metadata/
+
+# PyInstaller spec file (if you package later)
+*.spec
+
+##############################
+# QT / PYSIDE / UI TOOLING
+##############################
+
+# Qt compiled caches
+*.qmlc
+*.jsc
+
+# PySide / Qt generated bindings
+*.pyi
+
+# Qt cache and runtime files
+.cache/
+qt_cache/
+qtcreator/
+
+##############################
+# PROJECT-SPECIFIC IGNORE
+##############################
+
+# Ignore any generated configuration bundles
+app/static/output/
+app/static/generated/
+output/
+generated/
+
+# Ignore temporary runtime files
+*.tmp
+*.temp
+*.bak
+
+# Ignore JSON or local config overrides
+data/*.local.json
+data/*.backup.json
+data/*_cache.json
+
+# Node/OBR lookup should stay tracked:
+#   data/node_obr_assignment.json
+# but ignore any other generated data files:
+data/generated_*.json
+
+##############################
+# LOGGING & DEBUG
+##############################
+
+*.log
+logs/
+debug/
+crash_dumps/
+
+##############################
+# EDITORS / IDE
+##############################
+
+.vscode/
+.vscode/*        # workspace settings
+.idea/
+*.code-workspace
+
+# JetBrains IDE cruft
+*.iml
+
+##############################
+# OS / SYSTEM FILES
+##############################
+
+.DS_Store
+Thumbs.db
+.svn/
+*.swp
+*.swo
+*~
+
+##############################
+# SECRETS / ENV FILES
+##############################
+
+# dotenv for securing API keys, passwords, etc.
+.env
+.env.*
+secrets/
+credentials/
+
+##############################
+# TEST OUTPUT
+##############################
+
+coverage/
+htmlcov/
+.cache/
+pytest_cache/

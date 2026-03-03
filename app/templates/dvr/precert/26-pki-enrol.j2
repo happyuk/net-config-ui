@@ -1,0 +1,19 @@
+! PKI trustpoint + enrolment
+
+do mkdir bootflash:/pki-cert
+pki-cert
+
+crypto pki trustpoint DVR
+ enrollment url http://[2a08:605:0:443::deaf]:80
+ subject-name cn=N{{ node_number }}{{ domain }}002DVR001.DVR.dc2e.mnd.r.mil.uk
+ subject-alt-name N{{ node_number }}{{ domain }}002DVR001.DVR.dc2e.mnd.r.mil.uk
+ chain-validation continue DVR
+ vrf 100
+ storage bootflash:/pki-cert/
+ revocation-check none
+ source-interface GigabitEthernet3
+ rsakeypair DVR 4096
+ auto-enroll
+ hash sha512
+
+crypto pki enroll DVR
