@@ -31,7 +31,7 @@ class MainWindow(QWidget):
         self.api = None
 
         # ---- UI ----
-        self.setWindowTitle("DVR Router Config Builder")
+        self.setWindowTitle("Router Config Builder")
         self.resize(1000, 650)
 
         self.init_inputs()
