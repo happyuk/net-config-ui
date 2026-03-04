@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# usage:  bash <(wget -qO- https://raw.githubusercontent.com/happyuk/net-config-ui/main/bootstrap_public_repo.sh)
+
 set -e
 
 APP_DIR="$HOME/net-config-ui"
