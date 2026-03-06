@@ -1,0 +1,17 @@
+router bgp 6400.99
+ bgp router-id {{ grey_router }}
+ bgp asnotation dot
+ bgp log-neighbor-changes
+ bgp bestpath as-path multipath-relax
+ !
+ address-family ipv6 vrf Management
+  redistribute connected
+  neighbor 2A08:605:2:999::1013 remote-as 6400.102
+  neighbor 2A08:605:2:999::1013 password *8G9_Yi85k_E@$g*
+  neighbor 2A08:605:2:999::1013 update-source Tunnel999
+  neighbor 2A08:605:2:999::1013 fall-over bfd single-hop strict-mode
+  neighbor 2A08:605:2:999::1013 activate
+  neighbor 2A08:605:2:999::1013 send-community both
+  {# ... (Repeat for neighbor 1014) ... #}
+ exit-address-family
+!

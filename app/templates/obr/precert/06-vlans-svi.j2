@@ -1,0 +1,23 @@
+vlan 900
+ name Management
+!
+interface vlan 1
+ no ip address
+ shutdown
+!
+interface Vlan10
+ description Grey_Network
+ vrf forwarding IVRF
+ ip address {{ grey_router }} 255.255.255.240
+!
+interface Vlan900
+ vrf forwarding Management
+ no ip address
+ ipv6 address 2A08:605:2:{{ node_number }}::1/64
+ ospfv3 900 ipv6 area 0
+!
+interface loopback 900
+ vrf forwarding Management
+ no ip address
+ ipv6 address 2a08:605:2:900::{{ node_number }}/128
+!

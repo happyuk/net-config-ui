@@ -1,0 +1,28 @@
+crypto ikev2 proposal OBR_DMVPN_Proposal
+ encryption aes-cbc-256
+ integrity sha256
+ group 14
+!
+crypto ikev2 policy OBR_DMVPN_Policy
+ match fvrf DMVPN_FVRF
+ proposal OBR_DMVPN_Proposal
+no crypto ikev2 policy default
+!
+crypto ikev2 keyring OBR_DMVPN_Keyring
+ peer Node_Enrol_Key
+  address 0.0.0.0 0.0.0.0
+  identity address 2A08:605:2:999::17
+ pre-shared-key local {{ psk_key }}
+ pre-shared-key remote {{ psk_key }}
+!
+crypto ikev2 profile OBR_DMVPN_Enrol_Profile
+ match fvrf DMVPN_FVRF
+ match identity remote address 2A08:605:2:999::/64
+ identity local address 2A08:605:2:999::17
+ authentication remote pre-share
+ authentication local pre-share
+ keyring local OBR_DMVPN_Keyring
+ dpd 10 5 periodic
+!
+crypto ikev2 nat keepalive 20
+!

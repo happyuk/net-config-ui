@@ -1,0 +1,9 @@
+no ip ssh bulk-mode
+ip ssh version 2
+ip ssh time-out 60
+ip ssh authentication-retries 3
+ip ssh source-interface loopback 900
+!
+ntp server vrf Management 2A08:605:0:123::123 prefer
+ntp source loopback 900
+!

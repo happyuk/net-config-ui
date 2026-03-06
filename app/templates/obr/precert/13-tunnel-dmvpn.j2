@@ -1,0 +1,22 @@
+interface Tunnel999
+ description Cert Enrolment Tunnel
+ vrf forwarding Management
+ no ip address
+ no ip redirects
+ no ip proxy-arp
+ ip mtu 1400
+ ipv6 address 2A08:605:2:999::{{ node_number }}/64
+ ipv6 nhrp authentication {{ nhrp_auth | default('*1nT_Ct*') }}
+ ipv6 nhrp network-id 999
+ ipv6 nhrp nhs 2A08:605:2:999::1014 nbma 37.60.82.74 multicast
+ ipv6 nhrp bfd strict-mode
+ qos pre-classify
+ bfd local-address 2A08:605:2:999::{{ node_number }}
+ bfd template Single_Hop_BFD
+ tunnel source GigabitEthernet0/0/0
+ tunnel mode gre multipoint
+ tunnel key 999
+ tunnel path-mtu-discovery
+ tunnel vrf DMVPN_FVRF
+ tunnel protection ipsec profile OBR_DMVPN_Enrol_IPsec
+!

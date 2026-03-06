@@ -1,0 +1,32 @@
+# app/templates/banner_config_static.j2
+
+banner login #
+* UNAUTHORISED ACCESS TO THIS DEVICE IS PROHIBITED                   *
+*                                                                    *
+* Only authorised users are entitled to connect and/or login to this *
+* system. Authorised users are personnel whose duty is to            *
+* support this system and who have been expressly authorised by      *
+* the system administrator for this purpose.                         *
+* If you are not authorised to use this system, then you are         *
+* not to logon.                                                       *
+*                                                                    *
+* Unauthorised attempts and actions to access and use this system    *
+* may result in civil and/or criminal penalties.                     *
+*                                                                    *
+* Your activity on this system is monitored, recorded and audited to *
+* secure the effective operation of the system and for other lawful  *
+* purposes.                                                          *#
+!
+banner exec #
+* You have connected to a live platform.  Ensure all changes are     *
+* Planned and authorised.                                            *
+*                                                                    *
+* All changes are logged to the individual login.                   *#
+!
+banner motd #
+* There are no planned system outages                               *#
+!
+!ip admission auth-proxy-banner http #
+!*UNAUTHORISED ACCESS TO THIS DEVICE IS PROHIBITED*
+!*If you are not authorised to access this system,  STOP! *#
+!

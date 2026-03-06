@@ -1,0 +1,9 @@
+ip http server
+ip http authentication local
+ip http secure-server
+!
+ip http session-module-list http-module-list SCEP
+ip http active-session-modules http-module-list
+ip http timeout-policy idle 30 life 180 requests 10
+ip http client source-interface GigabitEthernet0/0/0
+!

@@ -1,0 +1,22 @@
+# app/templates/pki_config.j2
+
+Do Crypto key generate rsa general-key label OBR modulus 4096
+!
+Do mkdir bootflash:/pki-cert
+pki-cert
+!
+Crypto pki trustpoint OBR
+Enrollment url http://[2a08:605:0:443::deaf]:80
+Subject-name cn=N{{ node_number }}.OBR.dc2e.mnd.r.mil.uk
+Subject-alt-name N{{ node_number }}.OBR.dc2e.mnd.r.mil.uk
+Chain-validation continue OBR
+vrf Management
+storage bootflash:/pki-cert/
+Revocation-check none
+Source interface loopback 900
+Rsakeypair OBR 4096
+Auto-enroll
+Hash sha512
+!
+! WAIT for NTP STATUS!!!!!!!!!
+Crypto pki enroll OBR

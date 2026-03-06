@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QSettings
 
-from app.services.blocks import build_blocks, set_block_set
+from app.services.blocks import build_blocks, set_selected_template_set
 from app.services.deployer import Deployer
 from app.services.loader import NODE_OBR_ASSIGNMENT
 from app.gui.config_builder import ConfigBuilder
@@ -49,7 +49,7 @@ class MainWindow(QWidget):
         """Create all input widgets."""
         # Template selector
         self.template_mode = QComboBox()
-        self.template_mode.addItems(["DVR Pre-Cert", "DVR Post-Cert"])
+        self.template_mode.addItems(["DVR Pre-Cert", "DVR Post-Cert", "OBR Pre-Cert", "OBR Post-Cert"])
 
         # DVR selection
         self.template_mode.currentTextChanged.connect(self.on_template_changed)
@@ -87,7 +87,7 @@ class MainWindow(QWidget):
         # Calculated grey-IP fields
         self.grey_dhcp = QLineEdit();          self.grey_dhcp.setReadOnly(True)
         self.grey_router = QLineEdit();        self.grey_router.setReadOnly(True)
-        self.grey_dhcp_reserved = QLineEdit(); self.grey_dhcp_reserved.setReadOnly(True)
+        self.grey_router_dhcp_reserved = QLineEdit(); self.grey_router_dhcp_reserved.setReadOnly(True)
 
         # Buttons
         self.generate = QPushButton("Generate config")
@@ -118,7 +118,7 @@ class MainWindow(QWidget):
         self.right_form = QFormLayout()
         self.right_form.addRow("Grey DHCP:", self.grey_dhcp)
         self.right_form.addRow("Grey Router:", self.grey_router)
-        self.right_form.addRow("Grey DHCP Reserved:", self.grey_dhcp_reserved)
+        self.right_form.addRow("Grey DHCP Reserved:", self.grey_router_dhcp_reserved)
 
     def init_output(self):
         """Output text area."""
@@ -188,7 +188,7 @@ class MainWindow(QWidget):
         if node not in NODE_OBR_ASSIGNMENT:
             self.grey_dhcp.setText("Node not found")
             self.grey_router.clear()
-            self.grey_dhcp_reserved.clear()
+            self.grey_router_dhcp_reserved.clear()
             return
 
         lookup = NODE_OBR_ASSIGNMENT[node]
@@ -197,7 +197,7 @@ class MainWindow(QWidget):
 
         self.grey_dhcp.setText(network_base)
         self.grey_router.setText(add_to_last_octet(network_base, 1))
-        self.grey_dhcp_reserved.setText(add_to_last_octet(network_base, 4))
+        self.grey_router_dhcp_reserved.setText(add_to_last_octet(network_base, 4))
 
     def selected_template(self):
         mode = self.template_mode.currentText()
@@ -205,34 +205,71 @@ class MainWindow(QWidget):
             return "dvr/precert"
         if mode == "DVR Post-Cert":
             return "dvr/postcert"
+        if mode == "OBR Pre-Cert":
+            return "obr/precert"
+        if mode == "OBR Post-Cert":
+            return "obr/postcert"
         return None
 
     def on_generate(self):
+        """Generate config from GUI inputs using template + grey IPs."""
+        # 1. Save current user/device settings
         self.save_settings()
 
+        # 2. Get selected node
         node = self.nodenumber.currentText().strip()
+        
+        # 3. Populate calculated grey IP fields
         self.populate_grey_fields(node)
 
-        # NEW — switch the template set
+        # 4. Switch template set if needed
         blockset = self.selected_template()
         if blockset:
-            set_block_set(blockset)
+            set_selected_template_set(blockset)
 
         mode = self.template_mode.currentText()
 
+        # 5. Grab all values from widgets (strip spaces)
+        grey_dhcp = self.grey_dhcp.text().strip()
+        grey_router = self.grey_router.text().strip()
+        grey_router_dhcp_reserved = self.grey_router_dhcp_reserved.text().strip()
+        domain = self.domain.text().strip()
+        secret = self.secret.text().strip()
+        username = self.username.text().strip()
+        usersecret = self.usersecret.text().strip()
+
+        # 6. Optional debugging to verify values
+        print(f"DEBUG: grey_dhcp = {grey_dhcp}")
+        print(f"DEBUG: grey_router = {grey_router}")
+        print(f"DEBUG: grey_router_dhcp_reserved = {grey_router_dhcp_reserved}")
+        print(f"DEBUG: domain = {domain}")
+
+        # 7. Build the config via ConfigBuilder via Jinja2 template
         cfg = self.config_builder.build_from_label(
-            mode,
+            mode,  # DVR or OBR
             node_number=node,
-            domain=self.domain.text().strip(),
-            secret=self.secret.text().strip()
+            domain=domain,
+            secret=secret,
+            username=username,
+            usersecret=usersecret,
+            grey_dhcp=grey_dhcp,
+            grey_router=grey_router,
+            grey_router_dhcp_reserved=grey_router_dhcp_reserved
         )
 
+        # 8. Show generated config in GUI output
         self.output.setPlainText(cfg)
 
     def on_deploy_hostname(self):
         self.output.clear()
+        node_num = self.nodenumber.currentText()
+        domain = self.domain.text()
+        mode = self.template_mode.currentText()
 
-        hostname = f"N{self.nodenumber.currentText()}{self.domain.text()}002DVR001"
+        # Determine node type for hostname
+        node_type = "OBR" if "OBR" in mode else "DVR"
+        # Example: N17o001OBR001
+        hostname = f"N{node_num}{domain}001{node_type}001"
 
         deployer = Deployer(self.api)
         resp = deployer.deploy_hostname(hostname)
@@ -277,7 +314,7 @@ class MainWindow(QWidget):
         # ensure block-set aligns with the current dropdown selection
         blockset = self.selected_template()
         if blockset:
-            set_block_set(blockset)
+            set_selected_template_set(blockset)
 
         # 1) Extract host/user/pass
         host = self.device_host.text().strip()
@@ -396,7 +433,7 @@ class MainWindow(QWidget):
             # Recreate a fresh SSH client
             ssh = self._make_ssh(host, user, pwd)
         else:
-            # Set keepalives (seconds) to mitigate idle drops
+            # Set Keepalives (in seconds) to mitigate idle drops
             try:
                 transport.set_keepalive(30)
             except Exception:
@@ -426,16 +463,13 @@ class MainWindow(QWidget):
             btn.setEnabled(not busy)
 
     def on_template_changed(self, value: str):
-        """
-        Update the active block-set folder when the template dropdown is changed.
-        """
+        # Update active block-set folder when the template selection changed (OBR/DVR, pre/post cert)
         if not hasattr(self, "output"):
             return
-        if value == "DVR Pre-Cert":
-            set_block_set("dvr/precert")
-            self.output.append("[Info] Switched to PRE-CERT template set.")
-        elif value == "DVR Post-Cert":
-            set_block_set("dvr/postcert")
-            self.output.append("[Info] Switched to POST-CERT template set.")
+        
+        blockset = self.selected_template()
+        if blockset:
+            set_selected_template_set(blockset)
+            self.output.append(f"[Info] Switched to {value.upper()} template set.")
         else:
             self.output.append("[Warning] Unknown template mode selected.")

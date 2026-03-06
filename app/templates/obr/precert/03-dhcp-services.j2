@@ -1,0 +1,8 @@
+ip dhcp bootp ignore
+ip dhcp excluded-address vrf IVRF {{ grey_router }} {{ grey_router_dhcp_reserved }}
+ip dhcp pool grey_pool
+ vrf IVRF
+ network {{ grey_dhcp }}  255.255.255.240
+ default-router {{ grey_router }}
+ domain-name dc2e.mnd.r.mil.uk
+ dns-server {{ grey_router }}

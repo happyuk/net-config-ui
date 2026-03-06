@@ -1,0 +1,22 @@
+vrf definition DMVPN_FVRF
+ description Front Door VRF
+ !
+ address-family ipv4
+ exit-address-family
+!
+vrf definition IVRF
+ description Internal VRF
+ rd {{ ivrf_rd | default('6400.99:100') }}
+ !
+ address-family ipv4
+ exit-address-family
+!
+vrf definition Management
+ description Management VRF
+ rd {{ mgmt_rd | default('900:900') }}
+ !
+ address-family ipv6
+  route-target export 900:900
+  route-target import 900:900
+ exit-address-family
+!

@@ -1,0 +1,32 @@
+interface GigabitEthernet0/0/0
+ description MCN BEARER NETWORK CONNECTION
+ vrf forwarding DMVPN_FVRF
+ ip address dhcp
+ negotiation auto
+ no shutdown
+!
+interface GigabitEthernet0/0/1
+ description INTERNET BEARER NETWORK CONNECTION
+ vrf forwarding DMVPN_FVRF
+ no ip address
+ negotiation auto
+!
+interface GigabitEthernet0/1/0
+ description Grey_Network
+ switchport trunk native vlan 10
+ switchport trunk allowed vlan 10,900
+ switchport mode trunk
+ spanning-tree portfast
+ no shutdown
+!
+{# ... (Repeat for 0/1/1 through 0/1/6 as per your config) ... #}
+!
+interface GigabitEthernet0/1/7
+ description Grey_Network
+ switchport access vlan 900
+ switchport trunk native vlan 10
+ switchport trunk allowed vlan 10,900
+ switchport mode access
+ spanning-tree portfast
+ no shutdown
+!

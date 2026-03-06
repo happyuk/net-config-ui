@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional, Dict, List
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 
-
+# Render the Jinja template into config. string using the parameters provided (node, domain, secrets etc)
 class ConfigBuilder:
     """
     Centralised Jinja2 config rendering system.
@@ -31,7 +31,8 @@ class ConfigBuilder:
         self.registry: Dict[str, str] = {
             "DVR Pre-Cert": "dvr_pre-cert.j2",
             "DVR Post-Cert": "dvr_post-cert.j2",  
-            "OBR Pre-Cert": "obr_precert.j2",
+            "OBR Pre-Cert": "obr_pre-cert.j2",
+            "OBR Post-Cert": "obr_post-cert.j2",
         }
 
     # -----------------------------------------------------------
@@ -61,21 +62,20 @@ class ConfigBuilder:
     # -----------------------------------------------------------
     # RENDERING
     # -----------------------------------------------------------
-
     def render_template(
         self,
         template_name: str,
         node_number: str,
         domain: str,
-        secret: str
+        secret: str,
+        username: str,
+        usersecret: str,
+        grey_dhcp: str,
+        grey_router: str,
+        grey_router_dhcp_reserved: str,
     ) -> str:
         """
         Render the specified Jinja template.
-
-        All templates receive:
-            - node_number
-            - domain
-            - secret
         """
 
         try:
@@ -90,23 +90,28 @@ class ConfigBuilder:
             node_number=node_number,
             domain=domain,
             secret=secret,
+            username=username,
+            usersecret=usersecret,
+            grey_dhcp=grey_dhcp,
+            grey_router=grey_router,
+            grey_router_dhcp_reserved=grey_router_dhcp_reserved
         )
 
     # -----------------------------------------------------------
     # FRIENDLY WRAPPERS (OPTIONAL)
     # -----------------------------------------------------------
-
     def build_from_label(
         self,
         friendly_label: str,
         node_number: str,
         domain: str,
-        secret: str
+        secret: str,
+        username: str,
+        usersecret: str,
+        grey_dhcp: str,
+        grey_router: str,
+        grey_router_dhcp_reserved: str,
     ) -> str:
-        """
-        Render config from a UI-friendly name (e.g. 'DVR Pre-Cert').
-        Looks up template filename using the registry.
-        """
 
         filename = self.resolve_template(friendly_label)
 
@@ -119,4 +124,14 @@ class ConfigBuilder:
                 f"but does not exist in {self.templates_dir}"
             )
 
-        return self.render_template(filename, node_number, domain, secret)
+        return self.render_template(
+            filename,
+            node_number=node_number,
+            domain=domain,
+            secret=secret,
+            username=username,
+            usersecret=usersecret,
+            grey_dhcp=grey_dhcp,
+            grey_router=grey_router,
+            grey_router_dhcp_reserved=grey_router_dhcp_reserved
+        )

@@ -1,0 +1,14 @@
+aaa new-model
+!
+aaa authentication login default local
+aaa authorization console
+aaa authorization exec default local
+aaa authorization commands 15 default local
+!
+aaa session-id common
+!
+no ip domain lookup
+ip domain name dc2e.mnd.r.mil.uk
+ip domain name vrf.Management dc2e.mnd.r.mil.uk
+dir
+! CHECK - compare Colin's OBR EXcel versus other

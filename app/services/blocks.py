@@ -20,12 +20,14 @@ TOP_LEVEL_FILE = "dvr_pre-cert.j2"   # default
 TOP_FILE_MAP = {
     "dvr/precert":  "dvr_pre-cert.j2",
     "dvr/postcert": "dvr_post-cert.j2",
+    "obr/precert":  "obr_pre-cert.j2",  
+    "obr/postcert": "obr_post-cert.j2",  
 }
 
-def set_block_set(name: str):
+def set_selected_template_set(name: str):
     """
-    Set the active block-set directory, e.g., 'dvr/precert' or 'dvr/postcert',
-    and also switch the corresponding top-level *.j2 file that drives the build.
+    # Select the currently active template set (directory of Jinja templates) based on the user's choice 
+    # & update the corresponding top-level Jinja file that drives the command-building process
     """
     global BLOCK_SET_DIR, TOP_LEVEL_FILE
     BLOCK_SET_DIR = name
@@ -49,19 +51,14 @@ def _get_jinja_env() -> Environment:
     return _env
 
 
-def _tpl(name: str) -> str:
-    """Compose a template path under the current block-set directory."""
-    return f"{BLOCK_SET_DIR}/{name}".replace("\\", "/")
-
-
-def render_template_to_commands(
+# Convert Jinja template into list of CLI commands that will be executed on the device by the Deployer service
+def render_jinja_template_to_cli_commands(
     template_name: str,
     context: Dict[str, Any] | None = None,
     *,
     wrap_config_mode: bool = True,
     strip_bang_comments: bool = False,
 ) -> List[str]:
-    """Render a Jinja2 template into CLI commands."""
     env = _get_jinja_env()
     template = env.get_template(template_name)
     text: str = template.render(**(context or {}))
@@ -79,21 +76,6 @@ def render_template_to_commands(
         return ["configure terminal", *commands, "end"]
 
     return commands
-
-
-def _list_block_templates() -> List[str]:
-    """Return a sorted list of template paths under the active BLOCK_SET_DIR."""
-    root = TEMPLATES_DIR / BLOCK_SET_DIR
-    if not root.exists():
-        return []
-
-    files: List[str] = []
-    for p in sorted(root.iterdir()):
-        if p.is_file() and p.suffix == ".j2":
-            files.append(p.relative_to(TEMPLATES_DIR).as_posix())
-
-    return files
-
 
 def get_included_templates(top_level_filename: str) -> List[str]:
     """
@@ -157,7 +139,7 @@ def build_blocks(
         block = {
             "name": simple_name,
             "mode": "cli",
-            "commands": render_template_to_commands(
+            "commands": render_jinja_template_to_cli_commands(
                 rel_path,
                 ctx,
                 wrap_config_mode=True,

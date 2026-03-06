@@ -5,7 +5,7 @@ import re
 
 from app.services.output_cleaner import clean_output
 
-
+# Device configuration service: execute the blocks of commands generated from the jinja template
 class Deployer:
     def __init__(self, api, ssh_client=None, netconf_client=None):
         self.api = api
@@ -48,6 +48,7 @@ class Deployer:
         chan.settimeout(10)
         chan.set_combine_stderr(True)
 
+        # keep reading the SSH buffer until it sees the cursor blinking
         def read_until(prompt, timeout=10):
             end = time.time() + timeout
             buf = ""
@@ -69,18 +70,20 @@ class Deployer:
         chan.send("\r")
         read_until(prompt_regex)
 
-        # Prevent paging + widen terminal on the device side too
+        # Prevent paging & widen terminal on the device side to prevent curtailment of longer lines
         chan.send("terminal width 512\r")
         output_lines.append("> terminal width 512")
         output_lines.append(read_until(prompt_regex))
 
+        # VITAL: prevent paging, otherwise router stops & shows "--More--"" after 24 lines, causing a hang
         chan.send("terminal length 0\r")
         output_lines.append("> terminal length 0")
         output_lines.append(read_until(prompt_regex))
 
+        # Iterate through commands & capture output
         for cmd in commands:
             chan.send(cmd + "\r")
-            # tiny pause can help on some platforms
+            # a tiny pause can help on some platforms
             time.sleep(0.03)
             resp = read_until(prompt_regex)
 
@@ -89,6 +92,7 @@ class Deployer:
 
         chan.close()
 
+        # DeployWorker will expect a HTTP-style response
         class SimpleResp:
             status_code = 200
             text = "\n".join(output_lines)
@@ -96,10 +100,10 @@ class Deployer:
         return SimpleResp()
 
     # -----------------------------
-    # NETCONF placeholder
+    # NETCONF placeholder - TODO
     # -----------------------------
     def deploy_via_netconf(self, xml_payload: str):
-        raise NotImplementedError("NETCONF deployment not wired yet.")
+        raise NotImplementedError("NETCONF deployment not wired up yet.")
 
     # -----------------------------
     # Block dispatcher

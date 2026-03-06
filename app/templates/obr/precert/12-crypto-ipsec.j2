@@ -1,0 +1,8 @@
+crypto ipsec transform-set OBR_DMVPN_Transform-Set esp-aes 256 esp-sha256-hmac
+ mode tunnel
+!
+crypto ipsec profile OBR_DMVPN_Enrol_IPsec
+ set transform-set OBR_DMVPN_Transform-Set
+ set pfs group14
+ set ikev2-profile OBR_DMVPN_Enrol_Profile
+!

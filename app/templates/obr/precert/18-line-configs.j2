@@ -1,0 +1,13 @@
+line con 0
+ exec-timeout 10 0
+ logging synchronous
+ stopbits 1
+line vty 0 4
+ exec-timeout 10 0
+ logging synchronous
+ transport input ssh
+line vty 5 15
+ exec-timeout 10 0
+ logging synchronous
+ transport input ssh
+!

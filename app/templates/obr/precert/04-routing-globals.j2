@@ -1,0 +1,9 @@
+ipv6 unicast-routing
+!
+spanning-tree mode rapid-pvst
+spanning-tree extend system-id
+!
+bfd-template single-hop Single_Hop_BFD
+ interval min-tx 1500 min-rx 1500 multiplier 3
+ echo
+!
