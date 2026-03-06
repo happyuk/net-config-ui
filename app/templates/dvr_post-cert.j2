@@ -7,3 +7,6 @@
 {% include "dvr/postcert/04-bgp_base.j2" %}
 {% include "dvr/postcert/05-bgp_address_families.j2" %}
 {% include "dvr/postcert/06-dns_and_ipv6_routes.j2" %}
+
+{# Optional: finalize block to exit conf t and save running-config #}
+{# {% include "99-commit-save.j2" %} #}

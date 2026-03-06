@@ -1,0 +1,21 @@
+interface Tunnel102
+ description Internet_DMVPN_Tunnel
+ vrf forwarding IVRF
+ ip dhcp client broadcast-flag clear
+ ip address dhcp
+ no ip redirects
+ no ip proxy-arp
+ ip mtu 1400
+ ip nhrp authentication *1nT_Ig*
+ ip nhrp network-id 102
+ ip nhrp nhs 10.102.0.2 nbma 37.60.82.74 multicast
+ ip nhrp bfd strict-mode
+ qos pre-classify
+ bfd template Single_Hop_BFD
+ tunnel source GigabitEthernet0/0/0
+ tunnel mode gre multipoint
+ tunnel key 102
+ tunnel path-mtu-discovery
+ tunnel vrf DMVPN_FVRF
+tunnel protection ipsec profile OBR_DMVPN_Cert_IPsec shared
+!

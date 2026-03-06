@@ -1,0 +1,21 @@
+interface Tunnel101
+ description MCN Tunnel Interface
+ vrf forwarding IVRF
+ ip dhcp client broadcast-flag clear
+ ip address dhcp
+ no ip redirects
+ no ip proxy-arp
+ ip mtu 1475
+ ip nhrp authentication *B@l_Nh*
+ ip nhrp network-id 101
+ ip nhrp nhs 10.101.0.1 nbma 52.52.52.2 multicast
+ ip nhrp bfd strict-mode
+ qos pre-classify
+ bfd template Single_Hop_BFD
+ tunnel source GigabitEthernet0/0/1
+ tunnel mode gre multipoint
+ tunnel key 101
+ tunnel path-mtu-discovery
+ tunnel vrf DMVPN_FVRF
+shutdown
+!

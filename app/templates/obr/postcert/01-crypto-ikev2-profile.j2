@@ -1,0 +1,9 @@
+crypto ikev2 profile OBR_DMVPN_Cert_Profile
+ match fvrf DMVPN_FVRF
+ match identity remote address 2A08:605:2:902::/64
+ identity local address 2A08:605:2:902::{{ node_number }}
+ authentication remote rsa-sig
+ authentication local rsa-sig
+ pki trustpoint OBR
+ dpd 10 5 periodic
+!

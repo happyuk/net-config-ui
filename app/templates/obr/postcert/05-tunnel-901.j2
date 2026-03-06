@@ -1,0 +1,21 @@
+interface Tunnel901
+ description MCN_DMVPN_MANAGEMENT_TUNNEL
+ vrf forwarding Management
+ no ip address
+ no ip redirects
+ no ip proxy-arp
+ ip mtu 1400
+ ipv6 address 2A08:605:2:901::{{ node_number }}/64
+ ipv6 nhrp authentication *B@l_Nh*
+ ipv6 nhrp network-id 901
+ ipv6 nhrp nhs 2A08:605:2:901::1011 nbma 52.52.53.10 multicast
+ ipv6 nhrp bfd strict-mode
+ qos pre-classify
+ bfd template Single_Hop_BFD
+ tunnel source GigabitEthernet0/0/1
+ tunnel mode gre multipoint
+ tunnel key 901
+ tunnel path-mtu-discovery
+ tunnel vrf DMVPN_FVRF
+shutdown
+!

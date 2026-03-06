@@ -1,0 +1,39 @@
+router bgp 6400.99
+ address-family ipv6 vrf Management
+  redistribute connected
+  neighbor 2A08:605:2:901::1011 remote-as 6400.101
+  neighbor 2A08:605:2:901::1011 description CSIP OBR ROUTER 1 - MCN
+  neighbor 2A08:605:2:901::1011 password *8G9_Yi85k_E@$g*
+  neighbor 2A08:605:2:901::1011 update-source Tunnel901
+  neighbor 2A08:605:2:901::1011 fall-over bfd single-hop strict-mode
+  neighbor 2A08:605:2:901::1011 activate
+  neighbor 2A08:605:2:901::1011 send-community both
+  neighbor 2A08:605:2:901::1011 allowas-in 1
+  neighbor 2A08:605:2:901::1012 remote-as 6400.101
+  neighbor 2A08:605:2:901::1012 description CSIP OBR ROUTER 2 - MCN
+  neighbor 2A08:605:2:901::1012 password *8G9_Yi85k_E@$g*
+  neighbor 2A08:605:2:901::1012 update-source Tunnel901
+  neighbor 2A08:605:2:901::1012 fall-over bfd single-hop strict-mode
+  neighbor 2A08:605:2:901::1012 activate
+  neighbor 2A08:605:2:901::1012 send-community both
+  neighbor 2A08:605:2:901::1012 allowas-in 1
+  neighbor 2A08:605:2:902::1013 remote-as 6400.102
+  neighbor 2A08:605:2:902::1013 description CSIP OBR ROUTER 3 - INTERNET
+  neighbor 2A08:605:2:902::1013 password *8G9_Yi85k_E@$g*
+  neighbor 2A08:605:2:902::1013 update-source Tunnel902
+  neighbor 2A08:605:2:902::1013 fall-over bfd single-hop strict-mode
+  neighbor 2A08:605:2:902::1013 activate
+  neighbor 2A08:605:2:902::1013 send-community both
+  neighbor 2A08:605:2:902::1013 allowas-in 1
+  neighbor 2A08:605:2:902::1014 remote-as 6400.102
+  neighbor 2A08:605:2:902::1014 description CSIP OBR ROUTER 4 - INTERNET
+  neighbor 2A08:605:2:902::1014 password *8G9_Yi85k_E@$g*
+  neighbor 2A08:605:2:902::1014 update-source Tunnel902
+  neighbor 2A08:605:2:902::1014 fall-over bfd single-hop strict-mode
+  neighbor 2A08:605:2:902::1014 activate
+  neighbor 2A08:605:2:902::1014 send-community both
+  neighbor 2A08:605:2:902::1014 allowas-in 1
+  neighbor 2A08:605:2:999::1014 shut
+  neighbor 2A08:605:2:999::1013 shut
+ exit-address-family
+!

@@ -1,0 +1,15 @@
+{# === Combined preview of all OBR POST-CERT blocks === #}
+
+{% include "obr/postcert/00-tunnel-999.j2" %}
+{% include "obr/postcert/01-crypto-ikev2-profile.j2" %}
+{% include "obr/postcert/02-crypto-ipsec-profile.j2" %}
+{% include "obr/postcert/03-tunnel-101.j2" %}
+{% include "obr/postcert/04-tunnel-102.j2" %}
+{% include "obr/postcert/05-tunnel-901.j2" %}
+{% include "obr/postcert/06-tunnel-902.j2" %}
+{% include "obr/postcert/07-bgp-ipv4-ivrf.j2" %}
+{% include "obr/postcert/08-bgp-ipv6-management.j2" %}
+{% include "obr/postcert/09-prefix-lists.j2" %}
+
+{# Optional: finalize block to exit conf t and save running-config #}
+{# {% include "99-commit-save.j2" %} #}

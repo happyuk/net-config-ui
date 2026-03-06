@@ -1,0 +1,37 @@
+router bgp 6400.99
+ address-family ipv4 vrf IVRF
+  network {{ grey_dhcp }} mask 255.255.255.240
+  neighbor 10.101.0.1 remote-as 6400.101
+  neighbor 10.101.0.1 password *8G9_Yi85k_E@$g*
+  neighbor 10.101.0.1 update-source Tunnel101
+  neighbor 10.101.0.1 fall-over bfd single-hop strict-mode
+  neighbor 10.101.0.1 activate
+  neighbor 10.101.0.1 send-community both
+  neighbor 10.101.0.1 allowas-in 1
+  neighbor 10.101.0.1 prefix-list Advertise_Out out
+  neighbor 10.101.0.2 remote-as 6400.101
+  neighbor 10.101.0.2 password *8G9_Yi85k_E@$g*
+  neighbor 10.101.0.2 update-source Tunnel101
+  neighbor 10.101.0.2 fall-over bfd single-hop strict-mode
+  neighbor 10.101.0.2 activate
+  neighbor 10.101.0.2 send-community both
+  neighbor 10.101.0.2 allowas-in 1
+  neighbor 10.101.0.2 prefix-list Advertise_Out out
+  neighbor 10.102.0.1 remote-as 6400.102
+  neighbor 10.102.0.1 password *8G9_Yi85k_E@$g*
+  neighbor 10.102.0.1 update-source Tunnel102
+  neighbor 10.102.0.1 fall-over bfd single-hop strict-mode
+  neighbor 10.102.0.1 activate
+  neighbor 10.102.0.1 send-community both
+  neighbor 10.102.0.1 allowas-in 1
+  neighbor 10.102.0.1 prefix-list Advertise_Out out
+  neighbor 10.102.0.2 remote-as 6400.102
+  neighbor 10.102.0.2 password *8G9_Yi85k_E@$g*
+  neighbor 10.102.0.2 update-source Tunnel102
+  neighbor 10.102.0.2 fall-over bfd single-hop strict-mode
+  neighbor 10.102.0.2 activate
+  neighbor 10.102.0.2 send-community both
+  neighbor 10.102.0.2 allowas-in 1
+  neighbor 10.102.0.2 prefix-list Advertise_Out out
+ exit-address-family
+!

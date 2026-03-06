@@ -1,0 +1,21 @@
+interface Tunnel902
+ description INTERNET_DMVPN_MANAGEMENT_TUNNEL
+ vrf forwarding Management
+ no ip address
+ no ip redirects
+ no ip proxy-arp
+ ip mtu 1400
+ ipv6 address 2A08:605:2:902::{{ node_number }}/64
+ ipv6 nhrp authentication *1nT_Mg*
+ ipv6 nhrp network-id 902
+ ipv6 nhrp nhs 2A08:605:2:902::1014 nbma 37.60.82.74 multicast
+ ipv6 nhrp bfd strict-mode
+ qos pre-classify
+ bfd template Single_Hop_BFD
+ tunnel source GigabitEthernet0/0/0
+ tunnel mode gre multipoint
+ tunnel key 902
+ tunnel path-mtu-discovery
+ tunnel vrf DMVPN_FVRF
+tunnel protection ipsec profile OBR_DMVPN_Cert_IPsec shared
+!
