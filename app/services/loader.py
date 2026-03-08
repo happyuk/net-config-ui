@@ -13,5 +13,3 @@ def load_json(filename):
 
 # Load Node OBR assignment data
 NODE_OBR_ASSIGNMENT = load_json("node_obr_assignment.json")
-
-# Load TODO assignment data

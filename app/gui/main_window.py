@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QTextEdit, QVBoxLayout, QHBoxLayout, QFormLayout, QComboBox
 )
 from PySide6.QtCore import Qt, QSettings
+from PySide6.QtGui import QFont, QColor, QPalette
 
 from app.services.blocks import build_blocks, set_selected_template_set
 from app.services.deployer import Deployer
@@ -120,11 +121,25 @@ class MainWindow(QWidget):
         self.right_form.addRow("Grey Router:", self.grey_router)
         self.right_form.addRow("Grey DHCP Reserved:", self.grey_router_dhcp_reserved)
 
+    from PySide6.QtGui import QFont, QColor, QPalette
+
     def init_output(self):
-        """Output text area."""
+        """Output text area as CLI-style terminal."""
         self.output = QTextEdit()
         self.output.setReadOnly(True)
         self.output.clear()
+
+        # Monospace font
+        self.output.setFont(QFont("Courier New", 10))
+
+        # Black background, white text
+        palette = self.output.palette()
+        palette.setColor(QPalette.Base, QColor("black"))
+        palette.setColor(QPalette.Text, QColor("white"))
+        self.output.setPalette(palette)
+
+        # Optional: wrap text off to mimic CLI
+        self.output.setLineWrapMode(QTextEdit.NoWrap)
 
     def init_layout(self):
         """Final layout assembly."""
