@@ -2,12 +2,12 @@ import re
 
 _BACKSPACE_CLEAN = re.compile(r".\x08")
 _NONPRINTABLE = re.compile(r"[^\x09\x0A\x0D\x20-\x7E]")  # allow \t, \n, \r
-
-# New additions ↓↓↓
 _ANSI_ESCAPES = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
 _CISCO_WRAP = re.compile(r"\$")   # Cisco uses $ when wrapping templates
 _MULTI_BLANK = re.compile(r"\n\s*\n+")
 
+# Helper function to sanitise network device CLI text by removing backspaces, ANSI code
+# and other non-rointale characters and artifacts
 def clean_output(text: str) -> str:
     # 1. Remove IOS backspace erasures
     while True:
