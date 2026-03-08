@@ -22,8 +22,8 @@ class ConfigBuilder:
 
         self.env = Environment(
             loader=FileSystemLoader(self.templates_dir),
-            trim_blocks=True,
-            lstrip_blocks=True
+            trim_blocks=False,
+            lstrip_blocks=False
         )
 
         # Friendly names -> template filenames
@@ -33,6 +33,7 @@ class ConfigBuilder:
             "DVR Post-Cert": "dvr_post-cert.j2",  
             "OBR Pre-Cert": "obr_pre-cert.j2",
             "OBR Post-Cert": "obr_post-cert.j2",
+            "Show Running Config": "test-show-config.j2"
         }
 
     # -----------------------------------------------------------

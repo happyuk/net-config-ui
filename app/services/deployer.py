@@ -5,22 +5,15 @@ import re
 
 from app.services.output_cleaner import clean_output
 
-# Device configuration service: execute the blocks of commands generated from the jinja template
 class Deployer:
+    """
+    Device configuration service: executes blocks of commands generated 
+    from Jinja2 templates via RESTCONF or SSH CLI.
+    """
     def __init__(self, api, ssh_client=None, netconf_client=None):
         self.api = api
         self.ssh = ssh_client
         self.netconf = netconf_client
-
-    # -----------------------------
-    # Specific helper (kept): IOS-XE hostname via RESTCONF
-    # -----------------------------
-    def deploy_hostname(self, hostname: str):
-        payload = {"Cisco-IOS-XE-native:hostname": hostname}
-        return self.api.patch(
-            "Cisco-IOS-XE-native:native/hostname",
-            payload_json=payload
-        )
 
     # -----------------------------
     # Generic RESTCONF executor
@@ -43,7 +36,7 @@ class Deployer:
         if not self.ssh:
             raise RuntimeError("CLI deployment requested but no SSH client provided")
 
-        # Open a PTY with a wide width to prevent line-wrapping/echo glitches
+        # Open a PTY (terminal emulator) with a wide width to prevent line-wrapping/echo glitches
         chan = self.ssh.invoke_shell(term='vt100', width=512, height=24)
         chan.settimeout(10)
         chan.set_combine_stderr(True)
@@ -63,36 +56,48 @@ class Deployer:
                     time.sleep(0.05)
             return clean_output(buf)
 
-        output_lines = []
-        output_lines.append("CLI Session Start\n")
+        output_lines = ["CLI Session Start\n"]
 
-        # initial prompt
-        chan.send("\r")
+        # Initial prompt sync
+        chan.send("\n")
         read_until(prompt_regex)
 
         # Prevent paging & widen terminal on the device side to prevent curtailment of longer lines
-        chan.send("terminal width 512\r")
-        output_lines.append("> terminal width 512")
-        output_lines.append(read_until(prompt_regex))
+        for setup_cmd in ["terminal width 512", "terminal length 0"]:
+            chan.send(setup_cmd + "\n")
+            read_until(prompt_regex)
 
-        # VITAL: prevent paging, otherwise router stops & shows "--More--"" after 24 lines, causing a hang
-        chan.send("terminal length 0\r")
-        output_lines.append("> terminal length 0")
-        output_lines.append(read_until(prompt_regex))
+        # Flatten and clean the command list to prevent "mashing"
+        final_command_list = []
 
-        # Iterate through commands & capture output
-        for cmd in commands:
-            chan.send(cmd + "\r")
-            # a tiny pause can help on some platforms
-            time.sleep(0.03)
+        # If Jinja returned a single string, convert it to lines first
+        if isinstance(commands, str):
+            commands = commands.splitlines()
+
+        # Create clean list of CLI commands before sending them to the device
+        for item in commands:
+            for line in str(item).splitlines():
+                line = line.rstrip()
+                if line:
+                    final_command_list.append(line)
+
+        for cmd in final_command_list:
+            # Clear noise from buffer before sending
+            while chan.recv_ready():
+                chan.recv(65535)
+
+            # Send strictly one line at a time
+            chan.send(cmd + "\n")
+            
+            # Allow time for mode transitions (like 'conf t' or 'exit-address-family')
+            time.sleep(0.1) 
+            
             resp = read_until(prompt_regex)
-
             output_lines.append(f"\n$ {cmd}")
             output_lines.append(resp.strip())
 
         chan.close()
 
-        # DeployWorker will expect a HTTP-style response
         class SimpleResp:
             status_code = 200
             text = "\n".join(output_lines)
@@ -124,7 +129,6 @@ class Deployer:
             return name, self.deploy_via_netconf(block["xml"])
         else:
             raise ValueError(f"Unknown block mode '{mode}' for block '{name}'")
-
     # -----------------------------
     # Run full block list
     # -----------------------------
@@ -133,3 +137,10 @@ class Deployer:
         for block in blocks:
             results.append(self.deploy_block(block))
         return results
+
+    def deploy_hostname(self, hostname: str):
+        payload = {"Cisco-IOS-XE-native:hostname": hostname}
+        return self.api.patch(
+            "Cisco-IOS-XE-native:native/hostname",
+            payload_json=payload
+        )

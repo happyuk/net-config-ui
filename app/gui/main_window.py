@@ -49,7 +49,7 @@ class MainWindow(QWidget):
         """Create all input widgets."""
         # Template selector
         self.template_mode = QComboBox()
-        self.template_mode.addItems(["DVR Pre-Cert", "DVR Post-Cert", "OBR Pre-Cert", "OBR Post-Cert"])
+        self.template_mode.addItems(["DVR Pre-Cert", "DVR Post-Cert", "OBR Pre-Cert", "OBR Post-Cert", "Show Running Config"])
 
         # DVR selection
         self.template_mode.currentTextChanged.connect(self.on_template_changed)
@@ -209,6 +209,8 @@ class MainWindow(QWidget):
             return "obr/precert"
         if mode == "OBR Post-Cert":
             return "obr/postcert"
+        if mode == "Show Running Config":
+            return "test"
         return None
 
     def on_generate(self):

@@ -1,10 +1,8 @@
 ! DNS host entries for VOICE view (VRF 101) and global domain name
-
 ip host vrf 101 view VOICE ns 10.15.{{ node_number }}.1
 ip host vrf 101 view VOICE n{{ node_number }}.de2e.mnd.r.mil.uk 10.15.{{ node_number }}.1
 ip host vrf 101 view VOICE n{{ node_number }}0o02ETEL001.n{{ node_number }}.dc2e.mnd.r.mil.uk 10.15.{{ node_number }}.5
 ip host vrf 101 view VOICE n{{ node_number }}0o02EPX001.n{{ node_number }}.dc2e.mnd.r.mil.uk 10.15.{{ node_number }}.6
-
 ip host vrf 101 view VOICE _sip._udp.n{{ node_number }}0o02EPX001.n{{ node_number }}.dc2e.mnd.r.mil.uk srv 10 10 5060 n{{ node_number }}0o02EPX001.n{{ node_number }}.dc2e.mnd.r.mil.uk
 ip host vrf 101 view VOICE _sip._tcp.n{{ node_number }}0o02EPX001.n{{ node_number }}.dc2e.mnd.r.mil.uk srv 10 10 5060 n{{ node_number }}0o02EPX001.n{{ node_number }}.dc2e.mnd.r.mil.uk
 

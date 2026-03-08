@@ -1,5 +1,6 @@
 {# === Combined preview of all POST-CERT blocks === #}
 
+{% include "dvr/postcert/configure-terminal.j2" %}
 {% include "dvr/postcert/00-ikev2_profile.j2" %}
 {% include "dvr/postcert/01-ipsec_transform.j2" %}
 {% include "dvr/postcert/02-ipsec_profile.j2" %}
@@ -9,4 +10,4 @@
 {% include "dvr/postcert/06-dns_and_ipv6_routes.j2" %}
 
 {# Optional: finalize block to exit conf t and save running-config #}
-{# {% include "99-commit-save.j2" %} #}
+{% include "dvr/postcert/end.j2" %}

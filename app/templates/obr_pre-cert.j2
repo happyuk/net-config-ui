@@ -1,5 +1,6 @@
 {# === Combined preview of all OBR PRE-CERT blocks === #}
 
+{% include "obr/precert/configure-terminal.j2" %}
 {% include "obr/precert/00-init-identity.j2" %}                  
 {% include "obr/precert/01-vrf-definitions.j2" %}
 {% include "obr/precert/02-aaa-domain.j2" %}
@@ -20,3 +21,4 @@
 {% include "obr/precert/17-logging.j2" %}
 {% include "obr/precert/18-line-configs.j2" %}
 {% include "obr/precert/19-pki-enrollment.j2" %}
+{% include "obr/precert/end.j2" %}

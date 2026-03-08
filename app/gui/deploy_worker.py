@@ -95,11 +95,8 @@ class DeployWorker(QObject):
                 if text:
                     cleaned = text.strip()
                     self.log.emit("── Device Output ───────────────────────────────")
-                    if len(cleaned) > 2000:
-                        self.log.emit(cleaned[:2000])
-                        self.log.emit("… (output trimmed) …")
-                    else:
-                        self.log.emit(cleaned)
+                    # Simply emit the full string without checking length
+                    self.log.emit(cleaned)
                     self.log.emit("────────────────────────────────────────────────")
 
         except Exception as e:
@@ -108,7 +105,6 @@ class DeployWorker(QObject):
             self.finished.emit()
 
     # ---------- SSH helpers (copied/adapted from your MainWindow) ----------
-
     def _make_ssh(self, host: str, user: str, pwd: str) -> paramiko.SSHClient:
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())

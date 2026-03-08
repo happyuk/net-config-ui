@@ -1,5 +1,6 @@
 {# === Combined preview of all DRV PRE-CERT blocks === #}
 
+{% include "dvr/precert/configure-terminal.j2" %}
 {% include "dvr/precert/00-platform.j2" %}
 {% include "dvr/precert/01-hostname.j2" %}
 {% include "dvr/precert/02-vrfs.j2" %}
@@ -27,3 +28,4 @@
 {% include "dvr/precert/24-logging.j2" %}
 {% include "dvr/precert/25-lines.j2" %}
 {% include "dvr/precert/26-pki-enrol.j2" %}
+{% include "dvr/precert/end.j2" %}

@@ -22,6 +22,7 @@ TOP_FILE_MAP = {
     "dvr/postcert": "dvr_post-cert.j2",
     "obr/precert":  "obr_pre-cert.j2",  
     "obr/postcert": "obr_post-cert.j2",  
+    "test": "test-show-config.j2"
 }
 
 def set_selected_template_set(name: str):
@@ -51,29 +52,27 @@ def _get_jinja_env() -> Environment:
     return _env
 
 
+from typing import Any, Dict, List
+
 # Convert Jinja template into list of CLI commands that will be executed on the device by the Deployer service
 def render_jinja_template_to_cli_commands(
     template_name: str,
-    context: Dict[str, Any] | None = None,
+    context: dict | None = None,
     *,
-    wrap_config_mode: bool = True,
-    strip_bang_comments: bool = False,
-) -> List[str]:
+    strip_bang_comments: bool = False
+) -> list[str]:
     env = _get_jinja_env()
     template = env.get_template(template_name)
     text: str = template.render(**(context or {}))
 
-    commands: List[str] = []
-    for line in text.splitlines():
+    commands: list[str] = []
+    for line in text.split('\n'):  # Split on newline, preserves all lines including final blank
         line = line.rstrip()
-        if not line:
+        if not line:  # Skip empty lines
             continue
-        if strip_bang_comments and line.lstrip().startswith("!"):
+        if strip_bang_comments and line.lstrip().startswith('!'):
             continue
         commands.append(line)
-
-    if wrap_config_mode:
-        return ["configure terminal", *commands, "end"]
 
     return commands
 
@@ -141,9 +140,7 @@ def build_blocks(
             "mode": "cli",
             "commands": render_jinja_template_to_cli_commands(
                 rel_path,
-                ctx,
-                wrap_config_mode=True,
-                strip_bang_comments=True,
+                ctx
             ),
             "template_file": rel_path,
         }
