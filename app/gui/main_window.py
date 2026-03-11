@@ -96,9 +96,13 @@ class MainWindow(QWidget):
 
         self.test_api = QPushButton("Test RESTCONF")
         self.test_api.clicked.connect(self.on_test_restconf_api)
+        self.test_api.hide()
 
         self.deploy_full_btn = QPushButton("Deploy")
         self.deploy_full_btn.clicked.connect(self.on_deploy_full)
+
+        self.copy_btn = QPushButton("Copy Output")
+        self.copy_btn.clicked.connect(self.on_copy_output)
 
     def init_forms(self):
         """Left + right forms."""
@@ -152,6 +156,7 @@ class MainWindow(QWidget):
         buttons.addWidget(self.generate)
         buttons.addWidget(self.test_api)
         buttons.addWidget(self.deploy_full_btn)
+        buttons.addWidget(self.copy_btn)
 
         main_layout = QVBoxLayout()
         main_layout.addLayout(hbox)
@@ -456,7 +461,6 @@ class MainWindow(QWidget):
             except Exception:
                 pass
         return ssh
-    
 
     def _on_deploy_finished(self):
         try:
@@ -490,3 +494,15 @@ class MainWindow(QWidget):
             self.output.append(f"[Info] Switched to {value.upper()} template set.")
         else:
             self.output.append("[Warning] Unknown template mode selected.")
+
+    def on_copy_output(self):
+        """Copies the text from the output box to the system clipboard."""
+        text = self.output.toPlainText()
+        if text:
+            # Access the application-wide clipboard
+            from PySide6.QtGui import QGuiApplication
+            clipboard = QGuiApplication.clipboard()
+            clipboard.setText(text)
+            
+            # Optional: provide a small visual hint in the output
+            self.output.append("\n[System] Output copied to clipboard.")
