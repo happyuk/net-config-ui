@@ -88,7 +88,7 @@ class DeployWorker(QObject):
 
             ssh = self._ensure_ssh()
             deployer = Deployer(self.api, ssh_client=ssh)
-            self._log("\n[Deploy] Running blocks...")
+            self._log("\n[Deploy] Running commands...")
 
             total = len(self.blocks)
             for idx, block in enumerate(self.blocks, start=1):
@@ -98,8 +98,8 @@ class DeployWorker(QObject):
 
                 name = block.get("name", f"block-{idx}")
                 mode = block.get("mode", "?")
-                self._block_header(idx, total, name, mode)
-
+                # self._block_header(idx, total, name, mode)
+                # Or: just run the commands contained in the text output for more flexibility
                 if mode == "cli":
                     ssh = self._ensure_ssh()
                     ssh = self._make_ssh()  # fresh session per block

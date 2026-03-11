@@ -130,7 +130,7 @@ class MainWindow(QWidget):
     def init_output(self):
         """Output text area as CLI-style terminal."""
         self.output = QTextEdit()
-        self.output.setReadOnly(True)
+        self.output.setReadOnly(False)
         self.output.clear()
 
         # Monospace font
@@ -330,15 +330,8 @@ class MainWindow(QWidget):
             self.output.append(f"\n[API] Error: {e}")
 
     def on_deploy_full(self):
-        self.output.clear()
         self.save_settings()
 
-        # ensure block-set aligns with the current dropdown selection
-        blockset = self.selected_template()
-        if blockset:
-            set_selected_template_set(blockset)
-
-        # 1) Extract host/user/pass
         host = self.device_host.text().strip()
         user = self.device_user.text().strip()
         pwd  = self.device_pass.text().strip()
@@ -347,38 +340,24 @@ class MainWindow(QWidget):
             self.output.append("[Deploy] Missing device host/user/pass.")
             return
 
-        # 2) Reuse or create RESTCONF API session (optional; worker can create its own)
-        if not self.api:
-            self.api = RouterAPI(host, user, pwd, verify_tls=False)
+        # Extract commands from output text and put into an array
+        raw_text = self.output.toPlainText()
+        commands = [line.strip() for line in raw_text.splitlines() if line.strip()]
 
-        # 3) Build blocks
-        node   = self.nodenumber.currentText().strip()
-        domain = self.domain.text().strip()
-        blocks = build_blocks(node_number=node, domain=domain)
+        if not commands:
+            self.output.append("[Deploy] No commands in output box.")
+            return
 
-        # 4) Preview Execution Plan (in GUI thread)
-        self.output.append("[Deploy] Execution Plan:")
-        for i, b in enumerate(blocks, start=1):
-            name = b.get("name", f"block-{i}")
-            mode = b.get("mode", "?")
-            if mode == "restconf":
-                method = b.get("method", "PATCH")
-                resource = b.get("resource", "")
-                self.output.append(f"  {i:02d}. {name} [{mode}] {method} {resource}")
-            elif mode == "cli":
-                cmd_count = len(b.get("commands", []))
-                self.output.append(f"  {i:02d}. {name} [{mode}] {cmd_count} command(s)")
-            else:
-                self.output.append(f"  {i:02d}. {name} [{mode}]")
-
-        self.output.append("")  # spacer
-
-        # 5) Start threaded deployment
+        # Wrap into a single CLI block
+        blocks = [{
+            "name": "manual-output",
+            "mode": "cli",
+            "commands": commands
+        }]
         self.deploy_thread = QThread(self)
         self.deploy_worker = DeployWorker(blocks, host, user, pwd, api=self.api)
         self.deploy_worker.moveToThread(self.deploy_thread)
 
-        # Connect signals
         self.deploy_worker.log.connect(self.output.append)
         self.deploy_worker.error.connect(self.output.append)
         self.deploy_worker.finished.connect(self._on_deploy_finished)
@@ -386,11 +365,9 @@ class MainWindow(QWidget):
         self.deploy_thread.started.connect(self.deploy_worker.run)
         self.deploy_thread.finished.connect(self.deploy_thread.deleteLater)
 
-        # Disable buttons while running
         self._set_busy(True)
-
         self.deploy_thread.start()
-    
+ 
     def _make_ssh(self, host: str, user: str, pwd: str) -> paramiko.SSHClient:
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
