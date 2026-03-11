@@ -55,7 +55,12 @@ class Deployer:
         if not self.ssh:
             raise RuntimeError("CLI deployment requested but no SSH client provided")
 
-        chan = self.ssh.invoke_shell(term='vt100', width=512, height=24)
+        if not hasattr(self, "chan") or self.chan is None:
+            self.chan = self.ssh.invoke_shell(term='vt100', width=512, height=24)
+            self.chan.settimeout(10)
+            self.chan.set_combine_stderr(True)
+
+        chan = self.chan
         chan.settimeout(10)
         chan.set_combine_stderr(True)
 
@@ -77,9 +82,7 @@ class Deployer:
             time.sleep(0.1)
             resp = self._read_until(chan, prompt_regex)
             output_lines.append(f"\n$ {cmd}")
-            output_lines.append(resp.strip())
-
-        chan.close()
+            output_lines.append(resp.strip())        
 
         class SimpleResp:
             status_code = 200
