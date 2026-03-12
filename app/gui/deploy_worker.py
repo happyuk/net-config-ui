@@ -1,4 +1,5 @@
 from PySide6.QtCore import QObject, Signal, Slot
+from netmiko import ConnectHandler
 import paramiko
 from app.services.deployer import Deployer
 from app.services.router_api import RouterAPI
@@ -35,20 +36,15 @@ class DeployWorker(QObject):
             "└" + "─" * 45
         )
 
-    def _ensure_ssh(self, ssh=None):
+    def _ensure_ssh_connection(self, ssh=None):
         """Return a connected SSH client; reconnect if needed."""
         if ssh is None:
-            return self._make_ssh()
-        transport = ssh.get_transport()
-        if transport is None or not transport.is_active():
-            return self._make_ssh()
-        try:
-            transport.set_keepalive(30)
-        except Exception:
-            pass
+            return self._make_ssh_netmiko()
+        # Optional: could add reconnection logic here if ssh is disconnected
         return ssh
 
-    def _make_ssh(self):
+
+    def _make_ssh_paramiko(self):
         # Paramiko is a Python library for SSH connections
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -78,6 +74,17 @@ class DeployWorker(QObject):
             ssh._transport = transport
             return ssh
 
+    def _make_ssh_netmiko(self):
+        """Return a connected Netmiko SSH client."""
+        device = {
+            "device_type": "cisco_xr",
+            "host": self.host,
+            "username": self.user,
+            "password": self.pwd,
+            "port": 22,
+        }
+        return ConnectHandler(**device)
+
     @Slot()
     def run(self):
         try:
@@ -85,7 +92,7 @@ class DeployWorker(QObject):
             if self.api is None:
                 self.api = RouterAPI(self.host, self.user, self.pwd, verify_tls=False)
 
-            ssh = self._ensure_ssh()
+            ssh = self._ensure_ssh_connection()
             deployer = Deployer(self.api, ssh_client=ssh)
             self._log("\n[Deploy] Running commands...")
 
@@ -100,8 +107,7 @@ class DeployWorker(QObject):
                 # self._block_header(idx, total, name, mode)
                 # Or: just run the commands contained in the text output for more flexibility
                 if mode == "cli":
-                    ssh = self._ensure_ssh()
-                    ssh = self._make_ssh()  # fresh session per block
+                    ssh = self._ensure_ssh_connection()  # now uses Netmiko
                     deployer.ssh = ssh
 
                 try:

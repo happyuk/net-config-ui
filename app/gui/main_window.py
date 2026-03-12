@@ -1,4 +1,5 @@
 # app/gui/main_window.py
+from netmiko import ConnectHandler
 import paramiko
 
 # app/gui/main_window.py (imports at top)
@@ -367,77 +368,6 @@ class MainWindow(QWidget):
 
         self._set_busy(True)
         self.deploy_thread.start()
- 
-    def _make_ssh(self, host: str, user: str, pwd: str) -> paramiko.SSHClient:
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-        try:
-            # Try plain password auth first (most IOS-XE)
-            ssh.connect(
-                host,
-                username=user,
-                password=pwd,
-                port=22,
-                allow_agent=False,
-                look_for_keys=False,
-                auth_timeout=15,
-                banner_timeout=15,
-                timeout=15,
-            )
-
-            # Enable SSH keepalive packets (helps prevent idle drops)
-            try:
-                transport = ssh.get_transport()
-                if transport:
-                    transport.set_keepalive(30)  # seconds
-            except Exception:
-                pass
-
-            return ssh
-
-        except paramiko.AuthenticationException:
-            # Some AAA configs use keyboard-interactive; try that explicitly
-            try:
-                transport = paramiko.Transport((host, 22))
-                transport.start_client(timeout=15)
-
-                # Simple handler that just supplies the same password to all prompts
-                def handler(title, instructions, prompts):
-                    # prompts is a list of tuples: (prompt_text, echo)
-                    return [pwd for _ in prompts]
-
-                transport.auth_interactive(user, handler)
-                if not transport.is_authenticated():
-                    raise paramiko.AuthenticationException("keyboard-interactive auth failed")
-
-                # Bind the authenticated transport to a new SSHClient
-                ssh = paramiko.SSHClient()
-                ssh._transport = transport
-                return ssh
-
-            except Exception as e:
-                raise paramiko.AuthenticationException(f"SSH auth failed (password & keyboard-interactive): {e}") from e
-
-        except Exception as e:
-            # Network / cipher / banner issues etc.
-            raise RuntimeError(f"SSH connection failed: {e}") from e
-
-    def _ensure_ssh_active(self, ssh: paramiko.SSHClient, host: str, user: str, pwd: str) -> paramiko.SSHClient:
-        """
-        Ensure the SSHClient has an active transport; reconnect if needed.
-        """
-        transport = ssh.get_transport()
-        if transport is None or not transport.is_active():
-            # Recreate a fresh SSH client
-            ssh = self._make_ssh(host, user, pwd)
-        else:
-            # Set Keepalives (in seconds) to mitigate idle drops
-            try:
-                transport.set_keepalive(30)
-            except Exception:
-                pass
-        return ssh
 
     def _on_deploy_finished(self):
         try:
