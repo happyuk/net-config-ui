@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional, Dict, List
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 
-# Render the Jinja template into config. string using the parameters provided (node, domain, secrets etc)
+# Render the Jinja template into a config. string using the parameters provided from the UI (node, domain, secrets etc)
 class ConfigBuilder:
     """
     Centralised Jinja2 config rendering system.
@@ -13,7 +13,7 @@ class ConfigBuilder:
       - template lookup by filename
       - template registry for friendly names
       - auto-discovery of available templates
-      - clean error handling for missing templates
+      - error handling for missing templates
     """
 
     def __init__(self):

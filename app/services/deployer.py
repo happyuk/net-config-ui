@@ -55,32 +55,32 @@ class Deployer:
         if not self.ssh:
             raise RuntimeError("CLI deployment requested but no SSH client provided")
 
-        if not hasattr(self, "chan") or self.chan is None:
-            self.chan = self.ssh.invoke_shell(term='vt100', width=512, height=24)
-            self.chan.settimeout(10)
-            self.chan.set_combine_stderr(True)
+        if not hasattr(self, "chan") or self.channel is None:
+            self.channel = self.ssh.invoke_shell(term='vt100', width=512, height=24)
+            self.channel.settimeout(10)
+            self.channel.set_combine_stderr(True)
 
-        chan = self.chan
-        chan.settimeout(10)
-        chan.set_combine_stderr(True)
+        channel = self.channel
+        channel.settimeout(10)
+        channel.set_combine_stderr(True)
 
         output_lines = ["CLI Session Start\n"]
 
         # Initial prompt sync
-        chan.send("\n")
-        self._read_until(chan, prompt_regex)
+        channel.send("\n")
+        self._read_until(channel, prompt_regex)
 
         # Prevent paging & set wide terminal
         for cmd in ["terminal width 512", "terminal length 0"]:
-            chan.send(cmd + "\n")
-            self._read_until(chan, prompt_regex)
+            channel.send(cmd + "\n")
+            self._read_until(channel, prompt_regex)
 
         for cmd in self._normalize_commands(commands):
-            while chan.recv_ready():
-                chan.recv(65535)
-            chan.send(cmd + "\n")
+            while channel.recv_ready():
+                channel.recv(65535)
+            channel.send(cmd + "\n")
             time.sleep(0.1)
-            resp = self._read_until(chan, prompt_regex)
+            resp = self._read_until(channel, prompt_regex)
             output_lines.append(f"\n$ {cmd}")
             output_lines.append(resp.strip())        
 
@@ -91,7 +91,7 @@ class Deployer:
         return SimpleResp()
 
     # -----------------------------
-    # NETCONF placeholder
+    # NETCONF placeholder (TODO)
     # -----------------------------
     def deploy_via_netconf(self, xml_payload: str):
         raise NotImplementedError("NETCONF deployment not implemented yet.")

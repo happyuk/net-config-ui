@@ -3,7 +3,6 @@ import paramiko
 from app.services.deployer import Deployer
 from app.services.router_api import RouterAPI
 
-
 # Used to run sets of configuration blocks on a network device via a background thread
 # Threads allow the user to interact with the app while these commands are being executed
 class DeployWorker(QObject):

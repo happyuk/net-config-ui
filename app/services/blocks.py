@@ -113,7 +113,7 @@ def get_included_templates(top_level_filename: str) -> List[str]:
 
 
 # -----------------------------------------------------------------------------
-# Build CLI blocks
+# Build the CLI blocks
 # -----------------------------------------------------------------------------
 
 def build_blocks(*, node_number: str, domain: str) -> List[Block]:
