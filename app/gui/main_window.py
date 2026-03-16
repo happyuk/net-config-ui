@@ -12,8 +12,28 @@ from app.services.blocks import set_selected_template_set
 from app.services.loader import NODE_OBR_ASSIGNMENT
 from app.gui.config_builder import ConfigBuilder
 from app.services.router_api import RouterAPI
-from app.services.ip_utils import add_to_last_octet
 from app.services.config_manager import ConfigManager
+
+LEFT_FIELDS = [
+    ("Node Number", "nodenumber", QComboBox),
+    ("Template", "template_mode", QComboBox),
+    ("Domain", "domain", QLineEdit),
+    ("Secret", "secret", QLineEdit),
+    ("Username", "username", QLineEdit),
+    ("User Secret", "usersecret", QLineEdit),
+]
+
+DEVICE_FIELDS = [
+    ("Host", "device_host", QLineEdit),
+    ("User", "device_user", QLineEdit),
+    ("Pass", "device_pass", QLineEdit),
+]
+
+RIGHT_FIELDS = [
+    ("Grey DHCP", "grey_dhcp"),
+    ("Grey Router", "grey_router"),
+    ("Grey DHCP Reserved", "grey_router_dhcp_reserved"),
+]
 
 class MainWindow(QWidget):
     def __init__(self):
@@ -41,47 +61,66 @@ class MainWindow(QWidget):
 
     def init_inputs(self):
         """Create all input widgets."""
-        # Template selector
-        self.template_mode = QComboBox()
-        self.template_mode.addItems(["DVR Pre-Cert", "DVR Post-Cert", "OBR Pre-Cert", "OBR Post-Cert", "Show Running Config"])
+        self.widgets = {}
 
-        # DVR selection
+        # Create left side widgets
+        for label, name, widget_type in LEFT_FIELDS:
+            w = widget_type()
+
+            if name == "usersecret":
+                w.setEchoMode(QLineEdit.Password)
+
+            setattr(self, name, w)
+            self.widgets[name] = w
+
+        # Create device widgets
+        for label, name, widget_type in DEVICE_FIELDS:
+            w = widget_type()
+
+            if name == "device_pass":
+                w.setEchoMode(QLineEdit.Password)
+
+            setattr(self, name, w)
+            self.widgets[name] = w
+
+        # Create right side widgets (readonly)
+        for label, name in RIGHT_FIELDS:
+            w = QLineEdit()
+            w.setReadOnly(True)
+
+            setattr(self, name, w)
+            self.widgets[name] = w
+
+        # Populate template dropdown
+        self.template_mode.addItems([
+            "DVR Pre-Cert",
+            "DVR Post-Cert",
+            "OBR Pre-Cert",
+            "OBR Post-Cert",
+            "Show Running Config"
+        ])
+
         self.template_mode.currentTextChanged.connect(self.on_template_changed)
 
-        # Node selection
-        self.nodenumber = QComboBox()
+        # Populate node dropdown
         self.nodenumber.setEditable(False)
+
         try:
             keys = sorted(NODE_OBR_ASSIGNMENT.keys(), key=lambda k: int(k))
         except ValueError:
             keys = sorted(NODE_OBR_ASSIGNMENT.keys())
+
         self.nodenumber.addItems(keys)
 
-        # Basic fields
-        self.domain = QLineEdit();      self.domain.setPlaceholderText("e.g., o")
+        # Default values
         self.domain.setText("o")
-
-        self.secret = QLineEdit();      self.secret.setPlaceholderText("enable secret")
         self.secret.setText("DC2e*1234!")
-
-        self.username = QLineEdit();    self.username.setPlaceholderText("e.g., admin")
         self.username.setText("admin")
-
-        self.usersecret = QLineEdit()
-        self.usersecret.setPlaceholderText("password/secret")
-        self.usersecret.setEchoMode(QLineEdit.Password)
         self.usersecret.setText("DC2e*1234!")
 
-        # Device fields
-        self.device_host = QLineEdit(); self.device_host.setPlaceholderText("192.168.16.111")
-        self.device_user = QLineEdit(); self.device_user.setPlaceholderText("admin")
-        self.device_pass = QLineEdit(); self.device_pass.setPlaceholderText("device password")
-        self.device_pass.setEchoMode(QLineEdit.Password)
-
-        # Calculated grey-IP fields
-        self.grey_dhcp = QLineEdit();          self.grey_dhcp.setReadOnly(True)
-        self.grey_router = QLineEdit();        self.grey_router.setReadOnly(True)
-        self.grey_router_dhcp_reserved = QLineEdit(); self.grey_router_dhcp_reserved.setReadOnly(True)
+        self.device_host.setPlaceholderText("192.168.16.111")
+        self.device_user.setPlaceholderText("admin")
+        self.device_pass.setPlaceholderText("device password")
 
         # Buttons
         self.generate = QPushButton("Generate config")
@@ -97,34 +136,24 @@ class MainWindow(QWidget):
         self.copy_btn = QPushButton("Copy Output")
         self.copy_btn.clicked.connect(self.on_copy_output)
 
+
     def init_forms(self):
         """Left + right forms."""
+
         self.left_form = QFormLayout()
 
-        for label, widget in [
-            ("Node Number", self.nodenumber),
-            ("Template", self.template_mode),
-            ("Domain", self.domain),
-            ("Secret", self.secret),
-            ("Username", self.username),
-            ("User Secret", self.usersecret),
-        ]: self.left_form.addRow(f"{label}:", widget)
+        for label, name, _ in LEFT_FIELDS:
+            self.left_form.addRow(f"{label}:", self.widgets[name])
 
         self.left_form.addRow(QLabel("— Device (optional) —"))
-      
-        for label, widget in [
-            ("Host", self.device_host),
-            ("User", self.device_user),
-            ("Pass", self.device_pass),
-        ]: self.left_form.addRow(f"{label}:", widget)
+
+        for label, name, _ in DEVICE_FIELDS:
+            self.left_form.addRow(f"{label}:", self.widgets[name])
 
         self.right_form = QFormLayout()
 
-        for label, widget in [
-            ("Grey DHCP", self.grey_dhcp),
-            ("Grey Router", self.grey_router),
-            ("Grey DHCP Reserved", self.grey_router_dhcp_reserved),
-        ]: self.right_form.addRow(f"{label}:", widget)            
+        for label, name in RIGHT_FIELDS:
+            self.right_form.addRow(f"{label}:", self.widgets[name])         
 
     def init_output(self):
         """Output text area as CLI-style terminal."""
