@@ -21,6 +21,7 @@ from app.services.loader import NODE_OBR_ASSIGNMENT
 from app.gui.config_builder import ConfigBuilder
 from app.services.router_api import RouterAPI
 from app.services.ip_utils import add_to_last_octet
+from app.services.config_manager import ConfigManager
 
 
 class MainWindow(QWidget):
@@ -93,7 +94,7 @@ class MainWindow(QWidget):
 
         # Buttons
         self.generate = QPushButton("Generate config")
-        self.generate.clicked.connect(self.on_generate)
+        self.generate.clicked.connect(self.on_generate_config)
 
         self.test_api = QPushButton("Test RESTCONF")
         self.test_api.clicked.connect(self.on_test_restconf_api)
@@ -234,53 +235,36 @@ class MainWindow(QWidget):
             return "test"
         return None
 
-    def on_generate(self):
-        """Generate config from GUI inputs using template + grey IPs."""
-        # 1. Save current user/device settings
+    def on_generate_config(self):
         self.save_settings()
-
-        # 2. Get selected node
         node = self.nodenumber.currentText().strip()
-        
-        # 3. Populate calculated grey IP fields
-        self.populate_grey_fields(node)
-
-        # 4. Switch template set if needed
-        blockset = self.selected_template()
-        if blockset:
-            set_selected_template_set(blockset)
-
         mode = self.template_mode.currentText()
 
-        # 5. Grab all values from widgets (strip spaces)
-        grey_dhcp = self.grey_dhcp.text().strip()
-        grey_router = self.grey_router.text().strip()
-        grey_router_dhcp_reserved = self.grey_router_dhcp_reserved.text().strip()
-        domain = self.domain.text().strip()
-        secret = self.secret.text().strip()
-        username = self.username.text().strip()
-        usersecret = self.usersecret.text().strip()
+        # 1. Logic: Get IPs from the Manager
+        ips = ConfigManager.get_grey_ips(node)
+        if ips:
+            self.grey_dhcp.setText(ips["dhcp"])
+            self.grey_router.setText(ips["router"])
+            self.grey_router_dhcp_reserved.setText(ips["reserved"])
 
-        # 6. Optional debugging to verify values
-        print(f"DEBUG: grey_dhcp = {grey_dhcp}")
-        print(f"DEBUG: grey_router = {grey_router}")
-        print(f"DEBUG: grey_router_dhcp_reserved = {grey_router_dhcp_reserved}")
-        print(f"DEBUG: domain = {domain}")
+        # 2. Logic: Handle Template Switching
+        path = ConfigManager.get_template_path(mode)
+        if path:
+            set_selected_template_set(path)
 
-        # 7. Build the config via ConfigBuilder via Jinja2 template
+        # 3. Build the config
         cfg = self.config_builder.build_from_label(
-            mode,  # DVR or OBR
+            mode,
             node_number=node,
-            domain=domain,
-            secret=secret,
-            username=username,
-            usersecret=usersecret,
-            grey_dhcp=grey_dhcp,
-            grey_router=grey_router,
-            grey_router_dhcp_reserved=grey_router_dhcp_reserved
+            domain=self.domain.text().strip(),
+            secret=self.secret.text().strip(),
+            username=self.username.text().strip(),
+            usersecret=self.usersecret.text(),
+            grey_dhcp=self.grey_dhcp.text(),
+            grey_router=self.grey_router.text(),
+            grey_router_dhcp_reserved=self.grey_router_dhcp_reserved.text()
         )
 
-        # 8. Show generated config in GUI output
         self.output.setPlainText(cfg)
 
     def on_deploy_hostname(self):
