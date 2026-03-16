@@ -205,36 +205,6 @@ class MainWindow(QWidget):
     # LOGIC
     # ============================================================
 
-    def populate_grey_fields(self, node: str):
-        """Calculate grey fields based on JSON config."""
-        if node not in NODE_OBR_ASSIGNMENT:
-            self.grey_dhcp.setText("Node not found")
-            self.grey_router.clear()
-            self.grey_router_dhcp_reserved.clear()
-            return
-
-        lookup = NODE_OBR_ASSIGNMENT[node]
-        vlan10 = lookup["vlan_10_address_space"]
-        network_base = vlan10.split("/")[0]
-
-        self.grey_dhcp.setText(network_base)
-        self.grey_router.setText(add_to_last_octet(network_base, 1))
-        self.grey_router_dhcp_reserved.setText(add_to_last_octet(network_base, 4))
-
-    def selected_template(self):
-        mode = self.template_mode.currentText()
-        if mode == "DVR Pre-Cert":
-            return "dvr/precert"
-        if mode == "DVR Post-Cert":
-            return "dvr/postcert"
-        if mode == "OBR Pre-Cert":
-            return "obr/precert"
-        if mode == "OBR Post-Cert":
-            return "obr/postcert"
-        if mode == "Show Running Config":
-            return "test"
-        return None
-
     def on_generate_config(self):
         self.save_settings()
         node = self.nodenumber.currentText().strip()
