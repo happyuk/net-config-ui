@@ -1,28 +1,19 @@
 # app/gui/main_window.py
-from netmiko import ConnectHandler
-import paramiko
-
-# app/gui/main_window.py (imports at top)
 from PySide6.QtCore import Qt, QSettings, QThread
-# ...
-from app.gui.deploy_worker import DeployWorker
-
-
+from PySide6.QtGui import QFont, QColor, QPalette
 from PySide6.QtWidgets import (
     QWidget, QLabel, QLineEdit, QPushButton,
-    QTextEdit, QVBoxLayout, QHBoxLayout, QFormLayout, QComboBox
+    QTextEdit, QVBoxLayout, QHBoxLayout,
+    QFormLayout, QComboBox
 )
-from PySide6.QtCore import Qt, QSettings
-from PySide6.QtGui import QFont, QColor, QPalette
 
-from app.services.blocks import build_blocks, set_selected_template_set
-from app.services.deployer import Deployer
+from app.gui.deploy_worker import DeployWorker
+from app.services.blocks import set_selected_template_set
 from app.services.loader import NODE_OBR_ASSIGNMENT
 from app.gui.config_builder import ConfigBuilder
 from app.services.router_api import RouterAPI
 from app.services.ip_utils import add_to_last_octet
 from app.services.config_manager import ConfigManager
-
 
 class MainWindow(QWidget):
     def __init__(self):
@@ -108,26 +99,32 @@ class MainWindow(QWidget):
 
     def init_forms(self):
         """Left + right forms."""
-        # Left form inputs
         self.left_form = QFormLayout()
-        self.left_form.addRow("Node Number:", self.nodenumber)
-        self.left_form.addRow("Template:", self.template_mode)
-        self.left_form.addRow("Domain:", self.domain)
-        self.left_form.addRow("Secret:", self.secret)
-        self.left_form.addRow("Username:", self.username)
-        self.left_form.addRow("User Secret:", self.usersecret)
+
+        for label, widget in [
+            ("Node Number", self.nodenumber),
+            ("Template", self.template_mode),
+            ("Domain", self.domain),
+            ("Secret", self.secret),
+            ("Username", self.username),
+            ("User Secret", self.usersecret),
+        ]: self.left_form.addRow(f"{label}:", widget)
+
         self.left_form.addRow(QLabel("— Device (optional) —"))
-        self.left_form.addRow("Host:", self.device_host)
-        self.left_form.addRow("User:", self.device_user)
-        self.left_form.addRow("Pass:", self.device_pass)
+      
+        for label, widget in [
+            ("Host", self.device_host),
+            ("User", self.device_user),
+            ("Pass", self.device_pass),
+        ]: self.left_form.addRow(f"{label}:", widget)
 
-        # Right form output
         self.right_form = QFormLayout()
-        self.right_form.addRow("Grey DHCP:", self.grey_dhcp)
-        self.right_form.addRow("Grey Router:", self.grey_router)
-        self.right_form.addRow("Grey DHCP Reserved:", self.grey_router_dhcp_reserved)
 
-    from PySide6.QtGui import QFont, QColor, QPalette
+        for label, widget in [
+            ("Grey DHCP", self.grey_dhcp),
+            ("Grey Router", self.grey_router),
+            ("Grey DHCP Reserved", self.grey_router_dhcp_reserved),
+        ]: self.right_form.addRow(f"{label}:", widget)            
 
     def init_output(self):
         """Output text area as CLI-style terminal."""
@@ -237,23 +234,6 @@ class MainWindow(QWidget):
 
         self.output.setPlainText(cfg)
 
-    def on_deploy_hostname(self):
-        self.output.clear()
-        node_num = self.nodenumber.currentText()
-        domain = self.domain.text()
-        mode = self.template_mode.currentText()
-
-        # Determine node type for hostname
-        node_type = "OBR" if "OBR" in mode else "DVR"
-        # Example: N17o001OBR001
-        hostname = f"N{node_num}{domain}001{node_type}001"
-
-        deployer = Deployer(self.api)
-        resp = deployer.deploy_hostname(hostname)
-
-        self.output.append(f"Hostname deployment response: {resp.status_code}")
-        self.output.append(resp.text)
-
     def on_test_restconf_api(self):
         self.output.clear()
         self.save_settings()
@@ -345,16 +325,18 @@ class MainWindow(QWidget):
             btn.setEnabled(not busy)
 
     def on_template_changed(self, value: str):
-        # Update active block-set folder when the template selection changed (OBR/DVR, pre/post cert)
+        """Update the template set whenever the dropdown changes."""
+        # 1. Prevents crashing during initial window startup
         if not hasattr(self, "output"):
             return
+
+        path = ConfigManager.get_template_path(value)
         
-        blockset = self.selected_template()
-        if blockset:
-            set_selected_template_set(blockset)
+        if path:
+            set_selected_template_set(path)
             self.output.append(f"[Info] Switched to {value.upper()} template set.")
         else:
-            self.output.append("[Warning] Unknown template mode selected.")
+            self.output.append(f"[Warning] No template path found for: {value}")
 
     def on_copy_output(self):
         """Copies the text from the output box to the system clipboard."""
