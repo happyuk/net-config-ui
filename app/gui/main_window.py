@@ -7,12 +7,13 @@ from PySide6.QtWidgets import (
     QFormLayout, QComboBox
 )
 
-from app.gui.deploy_worker import DeployWorker
-from app.services.blocks import set_selected_template_set
-from app.services.loader import NODE_OBR_ASSIGNMENT
-from app.gui.config_builder import ConfigBuilder
+from app.workers.deploy_worker import DeployWorker
+from app.domain.config_blocks import set_selected_template_set
+from app.infrastructure.loader import NODE_OBR_ASSIGNMENT
+from app.domain.config_builder import ConfigBuilder
+from app.domain.config_manager import ConfigManager
 from app.services.router_api import RouterAPI
-from app.services.config_manager import ConfigManager
+
 
 LEFT_FIELDS = [
     ("Node Number", "nodenumber", QComboBox),

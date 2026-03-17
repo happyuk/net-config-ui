@@ -1,6 +1,6 @@
 import pytest
-from app.services.config_manager import ConfigManager
-from app.services.loader import NODE_OBR_ASSIGNMENT
+from app.domain.config_manager import ConfigManager
+from app.infrastructure.loader import NODE_OBR_ASSIGNMENT
 
 def test_get_grey_ips_valid_node():
     """Test using the first available node in the actual assignment data."""

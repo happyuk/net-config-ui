@@ -1,7 +1,7 @@
 # app/services/config_manager.py
-from app.services.loader import NODE_OBR_ASSIGNMENT
+from app.infrastructure.loader import NODE_OBR_ASSIGNMENT
 from app.services.ip_utils import add_to_last_octet
-from app.services.blocks import set_selected_template_set
+from app.domain.config_blocks import set_selected_template_set
 
 class ConfigManager:
     @staticmethod
