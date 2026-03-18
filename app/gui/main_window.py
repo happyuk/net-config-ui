@@ -2,7 +2,7 @@
 from PySide6.QtCore import Qt, QSettings
 from PySide6.QtGui import QFont, QColor, QPalette, QTextCursor
 from PySide6.QtWidgets import (
-    QProgressBar, QWidget, QLabel, QLineEdit, QPushButton,
+    QGroupBox, QProgressBar, QSplitter, QWidget, QLabel, QLineEdit, QPushButton,
     QTextEdit, QVBoxLayout, QHBoxLayout,
     QFormLayout, QComboBox
 )
@@ -26,8 +26,8 @@ LEFT_FIELDS = [
 
 DEVICE_FIELDS = [
     ("Host", "device_host", QLineEdit),
-    ("User", "device_user", QLineEdit),
-    ("Pass", "device_pass", QLineEdit),
+    ("Username", "device_user", QLineEdit),
+    ("Password", "device_pass", QLineEdit),
 ]
 
 RIGHT_FIELDS = [
@@ -150,22 +150,32 @@ class MainWindow(QWidget):
 
 
     def init_forms(self):
-        """Left + right forms."""
+        """Create separate forms for configuration and device credentials."""
 
+        # =========================
+        # CONFIGURATION FORM
+        # =========================
         self.left_form = QFormLayout()
 
         for label, name, _ in LEFT_FIELDS:
             self.left_form.addRow(f"{label}:", self.widgets[name])
 
-        self.left_form.addRow(QLabel("— Device (optional) —"))
+        # =========================
+        # DEVICE FORM (NEW)
+        # =========================
+        self.device_form = QFormLayout()
 
         for label, name, _ in DEVICE_FIELDS:
-            self.left_form.addRow(f"{label}:", self.widgets[name])
+            self.device_form.addRow(f"{label}:", self.widgets[name])
 
+        # =========================
+        # RIGHT FORM
+        # =========================
         self.right_form = QFormLayout()
 
         for label, name in RIGHT_FIELDS:
-            self.right_form.addRow(f"{label}:", self.widgets[name])         
+            self.right_form.addRow(f"{label}:", self.widgets[name])
+
 
     def init_output(self):
         """Output text area as CLI-style terminal."""
@@ -183,36 +193,95 @@ class MainWindow(QWidget):
         self.output.setPalette(palette)
 
         self.output.setLineWrapMode(QTextEdit.NoWrap)
-
-        # ✅ ADD THIS
         self.progressBar = QProgressBar()
         self.progressBar.setRange(0, 100)
         self.progressBar.setValue(0)
 
+    from PySide6.QtWidgets import QSplitter, QGroupBox
+
     def init_layout(self):
-        """Final layout assembly."""
-        hbox = QHBoxLayout()
-        hbox.addLayout(self.left_form, stretch=1)
-        hbox.addSpacing(40)
-        hbox.addLayout(self.right_form, stretch=1)
+        # =========================
+        # LEFT PANEL
+        # =========================
+        left_panel = QWidget()
+        left_layout = QVBoxLayout()
 
-        buttons = QHBoxLayout()
-        buttons.addWidget(self.generate)
-        buttons.addWidget(self.test_api)
-        buttons.addWidget(self.deploy_full_btn)
-        buttons.addWidget(self.copy_btn)
+        # ---- Configuration ----
+        form_box = QGroupBox("Node Configuration")
+        form_box.setLayout(self.left_form)
+        left_layout.addWidget(form_box)
 
+        # ---- Device Credentials ----
+        device_box = QGroupBox("Device Credentials")
+        device_layout = QVBoxLayout()
+
+        device_note = QLabel("Credentials required for SSH/NETCONF/RESTCONF")
+        device_note.setStyleSheet("color: orange; font-weight: bold;")
+
+        device_layout.addWidget(device_note)
+        device_layout.addLayout(self.device_form)   # <-- THIS is the key line
+
+        device_box.setLayout(device_layout)
+
+        left_layout.addWidget(device_box)
+
+        # ---- Actions ----
+        actions_box = QGroupBox("Actions")
+        actions_layout = QVBoxLayout()
+
+        actions_layout.addWidget(self.generate)
+        actions_layout.addWidget(self.test_api)
+        actions_layout.addWidget(self.deploy_full_btn)
+        actions_layout.addWidget(self.copy_btn)
+
+        actions_layout.addStretch()
+
+        actions_box.setLayout(actions_layout)
+
+        left_layout.addWidget(actions_box)
+
+        #left_layout.addStretch()
+        left_panel.setLayout(left_layout)
+
+        # =========================
+        # RIGHT PANEL
+        # =========================
+        right_panel = QWidget()
+        right_layout = QVBoxLayout()
+
+        output_box = QGroupBox("Output")
+        output_layout = QVBoxLayout()
+        output_layout.addWidget(self.output)
+        output_box.setLayout(output_layout)
+
+        right_layout.addWidget(output_box)
+        right_layout.addWidget(self.progressBar)
+
+        right_panel.setLayout(right_layout)
+
+        # =========================
+        # SPLITTER
+        # =========================
+        splitter = QSplitter(Qt.Horizontal)
+        splitter.addWidget(left_panel)
+        splitter.addWidget(right_panel)
+
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 3)
+        splitter.setSizes([300, 700])
+
+        self.splitter = splitter
+
+        # =========================
+        # MAIN LAYOUT
+        # =========================
         main_layout = QVBoxLayout()
-        main_layout.addLayout(hbox)
-        main_layout.addLayout(buttons)
+        main_layout.setContentsMargins(15, 15, 15, 15)
+        main_layout.setSpacing(10)
 
-        # Add progress bar ABOVE output
-        main_layout.addWidget(self.progressBar)
-
-        main_layout.addWidget(QLabel("Output:"))
-        main_layout.addWidget(self.output)
-
+        main_layout.addWidget(splitter)
         self.setLayout(main_layout)
+
 
     # ============================================================
     # SETTINGS
