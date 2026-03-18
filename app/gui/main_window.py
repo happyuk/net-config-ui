@@ -1,5 +1,5 @@
 # app/gui/main_window.py
-from PySide6.QtCore import Qt, QSettings, QThread
+from PySide6.QtCore import Qt, QSettings
 from PySide6.QtGui import QFont, QColor, QPalette
 from PySide6.QtWidgets import (
     QProgressBar, QWidget, QLabel, QLineEdit, QPushButton,
@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QFormLayout, QComboBox
 )
 
-from app.workers.deploy_worker import DeployWorker
+from app.utils.thread_runner import ThreadRunner
 from app.domain.config_blocks import set_selected_template_set
 from app.infrastructure.loader import NODE_OBR_ASSIGNMENT
 from app.domain.config_builder import ConfigBuilder
@@ -45,23 +45,19 @@ class MainWindow(QWidget):
         # ---- services ----
         self.settings = QSettings("QinetiQ", "DVRConfigBuilder")
         self.config_builder = ConfigBuilder()
+        self.runner = ThreadRunner(self)
 
         self.init_inputs()
         self.restore_settings()     # Load saved values AFTER creating widgets
         self.init_forms()
         self.init_output()
         self.init_layout()
-        
+
         self.vm = MainViewModel(
             config_builder=self.config_builder,
             config_manager=ConfigManager,
             template_setter=set_selected_template_set
         )
-
-        self.vm.deploy_log.connect(self.log)
-        self.vm.deploy_error.connect(self.log)
-        self.vm.deploy_progress.connect(self.progressBar.setValue)
-        self.vm.deploy_finished.connect(lambda: self._set_busy(False))
         self.api = None
 
         # ---- UI ----
@@ -287,6 +283,7 @@ class MainWindow(QWidget):
         self.save_settings()
 
         host, user, pwd = self.get_device_credentials()
+
         blocks, err = self.vm.prepare_deployment(
             self.output.toPlainText(),
             host, user, pwd
@@ -296,25 +293,21 @@ class MainWindow(QWidget):
             self.log(f"[Deploy] {err}")
             return
 
-        # Tell ViewModel to handle deployment
-        self.vm.start_deployment(blocks, host, user, pwd)
+        worker = self.vm.create_deploy_worker(blocks, host, user, pwd)
+
+        if not worker:
+            return
+        
+        self.progressBar.setValue(0)
         self._set_busy(True)
 
-
-    def _on_deploy_finished(self):
-        try:
-            self.log("\n[Deploy] Done.")
-        finally:
-            # Cleanup worker and thread objects
-            try:
-                self.deploy_thread.quit()
-            except Exception:
-                pass
-            try:
-                self.deploy_worker.deleteLater()
-            except Exception:
-                pass
-            self._set_busy(False)
+        self.runner.run(
+            worker,
+            on_log=self.log,
+            on_error=self.log,
+            on_progress=self.progressBar.setValue,
+            on_finished=self.on_deploy_finished
+        )
 
     def _set_busy(self, busy: bool):
         # Optional: change cursor and disable controls
@@ -348,6 +341,7 @@ class MainWindow(QWidget):
     
     def log(self, msg: str):
         self.output.append(msg)
+        self.output.ensureCursorVisible()
 
     def get_device_credentials(self):
         return (
@@ -367,19 +361,6 @@ class MainWindow(QWidget):
             "grey_router_dhcp_reserved": self.grey_router_dhcp_reserved.text()
         }
     
-    def start_deploy_thread(self, blocks, host, user, pwd):
-        self.deploy_thread = QThread()
-        self.deploy_worker = DeployWorker(blocks, host, user, pwd)
-
-        self.deploy_worker.moveToThread(self.deploy_thread)
-
-        # Connect signals
-        self.deploy_thread.started.connect(self.deploy_worker.run)
-        self.deploy_worker.finished.connect(self.deploy_thread.quit)
-        self.deploy_worker.finished.connect(self.deploy_worker.deleteLater)
-        self.deploy_thread.finished.connect(self.deploy_thread.deleteLater)
-
-        self.deploy_worker.log.connect(self.log)
-        self.deploy_worker.progress.connect(self.progressBar.setValue)
-
-        self.deploy_thread.start()
+    def on_deploy_finished(self):
+        self._set_busy(False)
+        self.log("\n[Deploy] Done.")

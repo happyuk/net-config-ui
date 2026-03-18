@@ -89,6 +89,7 @@ class DeployWorker(QObject):
     def run(self):
         try:
             # API session
+            self._log("[DEBUG] Worker started")
             if self.api is None:
                 self.api = RouterAPI(
                     self.host,
@@ -108,14 +109,13 @@ class DeployWorker(QObject):
                     break
 
                 if total > 0:
-                    self.progress.emit(int((idx - 1) / total * 100))
+                    self.progress.emit(int(idx / total * 100))
 
                 name = block.get("name", f"block-{idx}")
                 mode = block.get("mode", "?")
 
-                if mode == "cli":
-                    ssh = self._ensure_ssh_connection()
-                    deployer.ssh = ssh
+                if mode == "cli" and deployer.ssh is None:
+                    deployer.ssh = self._ensure_ssh_connection()
 
                 try:
                     blk_name, resp = deployer.deploy_block(block)
