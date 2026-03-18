@@ -1,5 +1,17 @@
-class MainViewModel:
+from app.services.router_api import RouterAPI
+from PySide6.QtCore import QObject, Signal, QThread, Slot
+from app.workers.deploy_worker import DeployWorker
+
+from PySide6.QtCore import QObject, Signal, QThread
+
+class MainViewModel(QObject):
+    deploy_log = Signal(str)
+    deploy_error = Signal(str)
+    deploy_progress = Signal(int)
+    deploy_finished = Signal()
+
     def __init__(self, config_builder, config_manager, template_setter):
+        super().__init__()
         self.config_builder = config_builder
         self.config_manager = config_manager
         self.template_setter = template_setter
@@ -48,3 +60,79 @@ class MainViewModel:
         if not (host and user and pwd):
             return False, "Missing device host/user/pass."
         return True, None
+    
+    def generate_config(self, node, mode, form_data):
+        ips = self.get_ips(node)
+
+        if ips:
+            form_data.update({
+                "grey_dhcp": ips["dhcp"],
+                "grey_router": ips["router"],
+                "grey_router_dhcp_reserved": ips["reserved"]
+            })
+
+        self.apply_template(mode)
+
+        config = self.build_config(mode, node, form_data)
+
+        return {
+            "config": config,
+            "ips": ips
+        }
+    
+    def prepare_deployment(self, raw_text, host, user, pwd):
+        ok, err = self.validate_device(host, user, pwd)
+        if not ok:
+            return None, err
+
+        blocks, err = self.prepare_deploy_blocks(raw_text)
+        if err:
+            return None, err
+
+        return blocks, None
+    
+    def test_restconf(self, host, user, pwd):
+        if not (host and user and pwd):
+            return False, "[API] Missing credentials", None
+
+        try:
+            api = RouterAPI(host, user, pwd, verify_tls=False)
+
+            ok, msg = api.ping()
+
+            extra = None
+            if ok:
+                r = api.get_native_hostname()
+                extra = (r.status_code, r.text[:2000])
+
+            return ok, msg, extra
+
+        except Exception as e:
+            return False, str(e), None
+        
+    def start_deployment(self, blocks, host, user, pwd):
+        if not blocks:
+            self.deploy_error.emit("No deployment blocks.")
+            return
+
+        self.thread = QThread()
+        self.worker = DeployWorker(blocks, host, user, pwd)
+
+        self.worker.moveToThread(self.thread)
+
+        # Worker → ViewModel
+        self.worker.log.connect(self.deploy_log)
+        self.worker.error.connect(self.deploy_error)
+        self.worker.progress.connect(self.deploy_progress)
+
+        # 🔥 IMPORTANT: forward finished signal
+        self.worker.finished.connect(self.deploy_finished)
+
+        # Thread cleanup
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+
+        self.thread.started.connect(self.worker.run)
+
+        self.thread.start()

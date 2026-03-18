@@ -9,6 +9,7 @@ from app.services.router_api import RouterAPI
 class DeployWorker(QObject):
     log = Signal(str)
     error = Signal(str)
+    progress = Signal(int) 
     finished = Signal()
 
     def __init__(self, blocks, host, user, pwd, api=None):
@@ -42,7 +43,6 @@ class DeployWorker(QObject):
             return self._make_ssh_netmiko()
         # Optional: could add reconnection logic here if ssh is disconnected
         return ssh
-
 
     def _make_ssh_paramiko(self):
         # Paramiko is a Python library for SSH connections
@@ -90,33 +90,41 @@ class DeployWorker(QObject):
         try:
             # API session
             if self.api is None:
-                self.api = RouterAPI(self.host, self.user, self.pwd, verify_tls=False)
+                self.api = RouterAPI(
+                    self.host,
+                    self.user,
+                    self.pwd,
+                    verify_tls=False
+                )
 
             ssh = self._ensure_ssh_connection()
             deployer = Deployer(self.api, ssh_client=ssh)
             self._log("\n[Deploy] Running commands...")
-
             total = len(self.blocks)
+
             for idx, block in enumerate(self.blocks, start=1):
                 if self._stop:
                     self._log("\n[Deploy] Cancel requested. Stopping…")
                     break
 
+                if total > 0:
+                    self.progress.emit(int((idx - 1) / total * 100))
+
                 name = block.get("name", f"block-{idx}")
                 mode = block.get("mode", "?")
-                # self._block_header(idx, total, name, mode)
-                # Or: just run the commands contained in the text output for more flexibility
+
                 if mode == "cli":
-                    ssh = self._ensure_ssh_connection()  # now uses Netmiko
+                    ssh = self._ensure_ssh_connection()
                     deployer.ssh = ssh
 
                 try:
                     blk_name, resp = deployer.deploy_block(block)
                 except Exception as e:
-                    self.error.emit(f"[Deploy] ({idx}/{total}) ERROR in {name}: {e}")
+                    self.error.emit(
+                        f"[Deploy] ({idx}/{total}) ERROR in {name}: {e}"
+                    )
                     continue
 
-                # Status logging
                 status = getattr(resp, "status_code", "n/a")
                 status_map = {200: "OK", 204: "No Content"}
                 status_str = f"{status} {status_map.get(status, '')}".strip()
@@ -140,7 +148,11 @@ class DeployWorker(QObject):
                         "────────────────────────────────────────────────"
                     )
 
+            if total > 0:
+                self.progress.emit(100)
+
         except Exception as e:
             self.error.emit(f"[Deploy] Fatal error: {e}")
+
         finally:
             self.finished.emit()

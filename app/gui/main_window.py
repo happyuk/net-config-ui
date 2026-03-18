@@ -2,7 +2,7 @@
 from PySide6.QtCore import Qt, QSettings, QThread
 from PySide6.QtGui import QFont, QColor, QPalette
 from PySide6.QtWidgets import (
-    QWidget, QLabel, QLineEdit, QPushButton,
+    QProgressBar, QWidget, QLabel, QLineEdit, QPushButton,
     QTextEdit, QVBoxLayout, QHBoxLayout,
     QFormLayout, QComboBox
 )
@@ -38,6 +38,7 @@ RIGHT_FIELDS = [
 ]
 
 class MainWindow(QWidget):
+    
     def __init__(self):
         super().__init__()
 
@@ -45,22 +46,29 @@ class MainWindow(QWidget):
         self.settings = QSettings("QinetiQ", "DVRConfigBuilder")
         self.config_builder = ConfigBuilder()
 
+        self.init_inputs()
+        self.restore_settings()     # Load saved values AFTER creating widgets
+        self.init_forms()
+        self.init_output()
+        self.init_layout()
+        
         self.vm = MainViewModel(
             config_builder=self.config_builder,
             config_manager=ConfigManager,
             template_setter=set_selected_template_set
         )
+
+        self.vm.deploy_log.connect(self.log)
+        self.vm.deploy_error.connect(self.log)
+        self.vm.deploy_progress.connect(self.progressBar.setValue)
+        self.vm.deploy_finished.connect(lambda: self._set_busy(False))
         self.api = None
 
         # ---- UI ----
         self.setWindowTitle("Router Config Builder")
         self.resize(1000, 650)
 
-        self.init_inputs()
-        self.restore_settings()     # Load saved values AFTER creating widgets
-        self.init_forms()
-        self.init_output()
-        self.init_layout()
+
  
 
     # ============================================================
@@ -169,17 +177,19 @@ class MainWindow(QWidget):
         self.output.setReadOnly(False)
         self.output.clear()
 
-        # Monospace font
         self.output.setFont(QFont("Courier New", 10))
 
-        # Black background, white text
         palette = self.output.palette()
         palette.setColor(QPalette.Base, QColor("black"))
         palette.setColor(QPalette.Text, QColor("white"))
         self.output.setPalette(palette)
 
-        # Optional: wrap text off to mimic CLI
         self.output.setLineWrapMode(QTextEdit.NoWrap)
+
+        # ✅ ADD THIS
+        self.progressBar = QProgressBar()
+        self.progressBar.setRange(0, 100)
+        self.progressBar.setValue(0)
 
     def init_layout(self):
         """Final layout assembly."""
@@ -197,6 +207,10 @@ class MainWindow(QWidget):
         main_layout = QVBoxLayout()
         main_layout.addLayout(hbox)
         main_layout.addLayout(buttons)
+
+        # Add progress bar ABOVE output
+        main_layout.addWidget(self.progressBar)
+
         main_layout.addWidget(QLabel("Output:"))
         main_layout.addWidget(self.output)
 
@@ -239,81 +253,53 @@ class MainWindow(QWidget):
     # LOGIC
     # ============================================================
 
-    def on_generate_config(self):        
+    def on_generate_config(self):
         self.save_settings()
-        node = self.nodenumber.currentText().strip()
-        mode = self.template_mode.currentText()
-        ips = self.vm.get_ips(node)
 
-        if ips:
-            self.grey_dhcp.setText(ips["dhcp"])
-            self.grey_router.setText(ips["router"])
-            self.grey_router_dhcp_reserved.setText(ips["reserved"])
+        result = self.vm.generate_config(
+            node=self.nodenumber.currentText().strip(),
+            mode=self.template_mode.currentText(),
+            form_data=self.collect_form_data()
+        )
 
-        self.vm.apply_template(mode)
-        data = self.collect_form_data()
-        cfg = self.vm.build_config(mode, node, data)
-        self.output.setPlainText(cfg)
+        if result["ips"]:
+            self.grey_dhcp.setText(result["ips"]["dhcp"])
+            self.grey_router.setText(result["ips"]["router"])
+            self.grey_router_dhcp_reserved.setText(result["ips"]["reserved"])
+
+        self.output.setPlainText(result["config"])
 
     def on_test_restconf_api(self):
         self.output.clear()
-        self.save_settings()
 
         host, user, pwd = self.get_device_credentials()
 
-        if not (host and user and pwd):
-            self.log("\n[API] Please fill Host/User/Pass to test RESTCONF.")
-            return
+        ok, msg, extra = self.vm.test_restconf(host, user, pwd)
 
-        try:
-            # Create API (your original works)
-            self.api = RouterAPI(host, user, pwd, verify_tls=False)
+        self.log(f"[API] {msg}")
 
-            ok, msg = self.api.ping()
-            self.log(f"[API] {msg}")
-
-            # Optional: if you want to also show a tiny JSON sample when reachable
-            if ok:
-                r = self.api.get_native_hostname()
-                self.log(f"[API] Sample GET native/hostname -> {r.status_code}")
-                # To avoid huge paste, only show first 2k chars
-                body = r.text or ""
-                self.log(body[:2000] + ("..." if len(body) > 2000 else ""))
-
-        except Exception as e:
-            self.log(f"\n[API] Error: {e}")
+        if extra:
+            code, body = extra
+            self.log(f"[API] Status: {code}")
+            self.log(body)
 
     def on_deploy_full(self):
         self.save_settings()
 
         host, user, pwd = self.get_device_credentials()
-
-        ok, err = self.vm.validate_device(host, user, pwd)
-        if not ok:
-            self.log(f"[Deploy] {err}")
-            return
-
-        raw_text = self.output.toPlainText()
-        blocks, err = self.vm.prepare_deploy_blocks(raw_text)
+        blocks, err = self.vm.prepare_deployment(
+            self.output.toPlainText(),
+            host, user, pwd
+        )
 
         if err:
             self.log(f"[Deploy] {err}")
             return
 
-        # --- UI STILL OWNS THREAD ---
-        self.deploy_thread = QThread(self)
-        self.deploy_worker = DeployWorker(blocks, host, user, pwd, api=self.api)
-        self.deploy_worker.moveToThread(self.deploy_thread)
-
-        self.deploy_worker.log.connect(self.log)
-        self.deploy_worker.error.connect(self.log)
-        self.deploy_worker.finished.connect(self._on_deploy_finished)
-
-        self.deploy_thread.started.connect(self.deploy_worker.run)
-        self.deploy_thread.finished.connect(self.deploy_thread.deleteLater)
-
+        # Tell ViewModel to handle deployment
+        self.vm.start_deployment(blocks, host, user, pwd)
         self._set_busy(True)
-        self.deploy_thread.start()
+
 
     def _on_deploy_finished(self):
         try:
@@ -380,3 +366,20 @@ class MainWindow(QWidget):
             "grey_router": self.grey_router.text(),
             "grey_router_dhcp_reserved": self.grey_router_dhcp_reserved.text()
         }
+    
+    def start_deploy_thread(self, blocks, host, user, pwd):
+        self.deploy_thread = QThread()
+        self.deploy_worker = DeployWorker(blocks, host, user, pwd)
+
+        self.deploy_worker.moveToThread(self.deploy_thread)
+
+        # Connect signals
+        self.deploy_thread.started.connect(self.deploy_worker.run)
+        self.deploy_worker.finished.connect(self.deploy_thread.quit)
+        self.deploy_worker.finished.connect(self.deploy_worker.deleteLater)
+        self.deploy_thread.finished.connect(self.deploy_thread.deleteLater)
+
+        self.deploy_worker.log.connect(self.log)
+        self.deploy_worker.progress.connect(self.progressBar.setValue)
+
+        self.deploy_thread.start()
