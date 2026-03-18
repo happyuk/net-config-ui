@@ -5,7 +5,7 @@ class MainViewModel:
         self.template_setter = template_setter
 
     # ---------------------------
-    # Core logic
+    # Business logic
     # ---------------------------
 
     def get_ips(self, node):
@@ -29,3 +29,22 @@ class MainViewModel:
             grey_router=data["grey_router"],
             grey_router_dhcp_reserved=data["grey_router_dhcp_reserved"]
         )
+    
+    def prepare_deploy_blocks(self, raw_text: str):
+        commands = [line.strip() for line in raw_text.splitlines() if line.strip()]
+
+        if not commands:
+            return None, "No commands in output box."
+
+        blocks = [{
+            "name": "manual-output",
+            "mode": "cli",
+            "commands": commands
+        }]
+
+        return blocks, None
+    
+    def validate_device(self, host, user, pwd):
+        if not (host and user and pwd):
+            return False, "Missing device host/user/pass."
+        return True, None

@@ -92,44 +92,42 @@ class Deployer:
         return SimpleResp()
 
     def deploy_via_cli_netmiko(self, commands):
-        """
-        Smartly deploys commands by detecting if they are configuration 
-        changes or simple 'show' commands.
-        """
         if not self.ssh:
             raise RuntimeError("CLI deployment requested but no SSH client provided")
 
-        # 1. Clean up the commands: remove 'conf t', '!', and empty lines
-        cleaned_cmds = []
-        is_config_block = False
-
-        # Normalize input: ensure it's a list even if a single string was passed
         if isinstance(commands, str):
             commands = commands.splitlines()
 
+        cleaned_cmds = []
+        is_config = False
+
         for cmd in commands:
             c = cmd.strip()
-            if not c or c == "!":
+
+            # Skip empty + comments
+            if not c or c.startswith("!"):
                 continue
+
+            # Detect config intent ONLY by explicit conf t
             if c.lower() in ["conf t", "configure terminal"]:
-                is_config_block = True  # We found a 'conf t', so treat the whole block as config
+                is_config = True
                 continue
+
             cleaned_cmds.append(c)
 
-        # 2. Execute based on intent
         try:
-            # If we detected 'conf t' OR if there are multiple lines (usually a config block)
-            if is_config_block or len(cleaned_cmds) > 1:
-                # send_config_set automatically enters 'conf t', sends commands, and exits
+            if is_config:
+                # User explicitly wants config mode
                 output = self.ssh.send_config_set(cleaned_cmds)
             else:
-                # Single command (likely a 'show' or 'exec' command)
-                output = self.ssh.send_command(cleaned_cmds[0])
-                
+                # Everything else = exec mode
+                output = "\n".join(
+                    self.ssh.send_command(cmd) for cmd in cleaned_cmds
+                )
+
         except Exception as e:
             output = f"Error during deployment: {str(e)}"
 
-        # 3. Return response object to match your existing UI logic
         class SimpleResp:
             def __init__(self, text):
                 self.status_code = 200

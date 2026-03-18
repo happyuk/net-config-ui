@@ -286,28 +286,21 @@ class MainWindow(QWidget):
     def on_deploy_full(self):
         self.save_settings()
 
-        host = self.device_host.text().strip()
-        user = self.device_user.text().strip()
-        pwd  = self.device_pass.text().strip()
+        host, user, pwd = self.get_device_credentials()
 
-        if not (host and user and pwd):
-            self.log("[Deploy] Missing device host/user/pass.")
+        ok, err = self.vm.validate_device(host, user, pwd)
+        if not ok:
+            self.log(f"[Deploy] {err}")
             return
 
-        # Extract commands from output text and put into an array
         raw_text = self.output.toPlainText()
-        commands = [line.strip() for line in raw_text.splitlines() if line.strip()]
+        blocks, err = self.vm.prepare_deploy_blocks(raw_text)
 
-        if not commands:
-            self.log("[Deploy] No commands in output box.")
+        if err:
+            self.log(f"[Deploy] {err}")
             return
 
-        # Wrap into a single CLI block
-        blocks = [{
-            "name": "manual-output",
-            "mode": "cli",
-            "commands": commands
-        }]
+        # --- UI STILL OWNS THREAD ---
         self.deploy_thread = QThread(self)
         self.deploy_worker = DeployWorker(blocks, host, user, pwd, api=self.api)
         self.deploy_worker.moveToThread(self.deploy_thread)
