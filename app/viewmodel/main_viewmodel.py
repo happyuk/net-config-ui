@@ -1,5 +1,6 @@
-from PySide6.QtCore import QObject, Signal, QThread
+from PySide6.QtCore import QObject, Qt, Signal, QThread
 from app.workers.deploy_worker import DeployWorker
+from app.services.router_api import RouterAPI
 
 class MainViewModel(QObject):
     deploy_log = Signal(str)
@@ -108,12 +109,6 @@ class MainViewModel(QObject):
 
         except Exception as e:
             return False, str(e), None
-        
-    def create_deploy_worker(self, blocks, host, user, pwd):
-        if not blocks:
-            self.deploy_error.emit("No deployment blocks.")
-            return None
-        return DeployWorker(blocks, host, user, pwd)
     
     def start_deployment(self, blocks, host, user, pwd):
         if not blocks:
@@ -137,8 +132,13 @@ class MainViewModel(QObject):
         self._thread.finished.connect(self._thread.deleteLater)
 
         # When done, notify UI
-        self._worker.finished.connect(self.deploy_finished)
+        self._worker.finished.connect(self._on_deploy_finished_internal)
 
         # Start execution
-        self._thread.started.connect(self._worker.run)
+        self._thread.started.connect(self._worker.run, Qt.QueuedConnection)
         self._thread.start()
+
+    def _on_deploy_finished_internal(self):
+        self.deploy_finished.emit()
+        self._thread = None
+        self._worker = None

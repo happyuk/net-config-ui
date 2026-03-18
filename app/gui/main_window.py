@@ -1,6 +1,6 @@
 # app/gui/main_window.py
 from PySide6.QtCore import Qt, QSettings
-from PySide6.QtGui import QFont, QColor, QPalette
+from PySide6.QtGui import QFont, QColor, QPalette, QTextCursor
 from PySide6.QtWidgets import (
     QProgressBar, QWidget, QLabel, QLineEdit, QPushButton,
     QTextEdit, QVBoxLayout, QHBoxLayout,
@@ -332,7 +332,7 @@ class MainWindow(QWidget):
             self.log("\n[System] Output copied to clipboard.")
     
     def log(self, msg: str):
-        self.output.append(msg)
+        self.output.moveCursor(QTextCursor.End)
         self.output.ensureCursorVisible()
 
     def get_device_credentials(self):
