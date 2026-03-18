@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
     QFormLayout, QComboBox
 )
 
-from app.utils.thread_runner import ThreadRunner
 from app.domain.config_blocks import set_selected_template_set
 from app.infrastructure.loader import NODE_OBR_ASSIGNMENT
 from app.domain.config_builder import ConfigBuilder
@@ -45,7 +44,6 @@ class MainWindow(QWidget):
         # ---- services ----
         self.settings = QSettings("QinetiQ", "DVRConfigBuilder")
         self.config_builder = ConfigBuilder()
-        self.runner = ThreadRunner(self)
 
         self.init_inputs()
         self.restore_settings()     # Load saved values AFTER creating widgets
@@ -59,6 +57,10 @@ class MainWindow(QWidget):
             template_setter=set_selected_template_set
         )
         self.api = None
+        self.vm.deploy_log.connect(self.log)
+        self.vm.deploy_error.connect(self.log)
+        self.vm.deploy_progress.connect(self.progressBar.setValue)
+        self.vm.deploy_finished.connect(self.on_deploy_finished)
 
         # ---- UI ----
         self.setWindowTitle("Router Config Builder")
@@ -293,21 +295,11 @@ class MainWindow(QWidget):
             self.log(f"[Deploy] {err}")
             return
 
-        worker = self.vm.create_deploy_worker(blocks, host, user, pwd)
-
-        if not worker:
-            return
-        
         self.progressBar.setValue(0)
         self._set_busy(True)
 
-        self.runner.run(
-            worker,
-            on_log=self.log,
-            on_error=self.log,
-            on_progress=self.progressBar.setValue,
-            on_finished=self.on_deploy_finished
-        )
+        # Delegated to ViewModel
+        self.vm.start_deployment(blocks, host, user, pwd)
 
     def _set_busy(self, busy: bool):
         # Optional: change cursor and disable controls

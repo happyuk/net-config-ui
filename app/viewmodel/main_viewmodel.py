@@ -1,5 +1,4 @@
-from app.services.router_api import RouterAPI
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, Signal, QThread
 from app.workers.deploy_worker import DeployWorker
 
 class MainViewModel(QObject):
@@ -13,6 +12,8 @@ class MainViewModel(QObject):
         self.config_builder = config_builder
         self.config_manager = config_manager
         self.template_setter = template_setter
+        self._thread = None
+        self._worker = None
 
     # ---------------------------
     # Business logic
@@ -113,3 +114,31 @@ class MainViewModel(QObject):
             self.deploy_error.emit("No deployment blocks.")
             return None
         return DeployWorker(blocks, host, user, pwd)
+    
+    def start_deployment(self, blocks, host, user, pwd):
+        if not blocks:
+            self.deploy_error.emit("No deployment blocks.")
+            return
+
+        # Create thread + worker
+        self._thread = QThread()
+        self._worker = DeployWorker(blocks, host, user, pwd)
+
+        self._worker.moveToThread(self._thread)
+
+        # Connect worker → ViewModel signals
+        self._worker.log.connect(self.deploy_log)
+        self._worker.error.connect(self.deploy_error)
+        self._worker.progress.connect(self.deploy_progress)
+
+        # Lifecycle management
+        self._worker.finished.connect(self._thread.quit)
+        self._worker.finished.connect(self._worker.deleteLater)
+        self._thread.finished.connect(self._thread.deleteLater)
+
+        # When done, notify UI
+        self._worker.finished.connect(self.deploy_finished)
+
+        # Start execution
+        self._thread.started.connect(self._worker.run)
+        self._thread.start()
