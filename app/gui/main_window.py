@@ -67,8 +67,6 @@ class MainWindow(QWidget):
         self.resize(1000, 650)
 
 
- 
-
     # ============================================================
     # UI SETUP
     # ============================================================
@@ -175,11 +173,13 @@ class MainWindow(QWidget):
         self.output.setReadOnly(False)
         self.output.clear()
 
-        self.output.setFont(QFont("Courier New", 10))
+        font = QFont("Courier New")
+        font.setStyleHint(QFont.Monospace)
+        self.output.setFont(font)
 
         palette = self.output.palette()
         palette.setColor(QPalette.Base, QColor("black"))
-        palette.setColor(QPalette.Text, QColor("white"))
+        palette.setColor(QPalette.Text, QColor(230, 230, 230))
         self.output.setPalette(palette)
 
         self.output.setLineWrapMode(QTextEdit.NoWrap)
@@ -333,6 +333,7 @@ class MainWindow(QWidget):
     
     def log(self, msg: str):
         self.output.moveCursor(QTextCursor.End)
+        self.output.insertPlainText(msg + "\n")
         self.output.ensureCursorVisible()
 
     def get_device_credentials(self):

@@ -8,11 +8,17 @@ class MainViewModel(QObject):
     deploy_progress = Signal(int)
     deploy_finished = Signal()
 
-    def __init__(self, config_builder, config_manager, template_setter):
+    def __init__(self, config_builder, config_manager, template_setter, worker_factory=None, thread_factory=None):
         super().__init__()
         self.config_builder = config_builder
         self.config_manager = config_manager
         self.template_setter = template_setter
+         # Injected factories (for testing)
+        self.worker_factory = worker_factory or DeployWorker
+        self.thread_factory = thread_factory or QThread
+
+        self._thread = None
+        self._worker = None
         self._thread = None
         self._worker = None
 
@@ -115,28 +121,26 @@ class MainViewModel(QObject):
             self.deploy_error.emit("No deployment blocks.")
             return
 
-        # Create thread + worker
-        self._thread = QThread()
-        self._worker = DeployWorker(blocks, host, user, pwd)
+        self._thread = self.thread_factory()
+        self._worker = self.worker_factory(blocks, host, user, pwd)
 
         self._worker.moveToThread(self._thread)
 
-        # Connect worker → ViewModel signals
         self._worker.log.connect(self.deploy_log)
         self._worker.error.connect(self.deploy_error)
         self._worker.progress.connect(self.deploy_progress)
 
-        # Lifecycle management
         self._worker.finished.connect(self._thread.quit)
         self._worker.finished.connect(self._worker.deleteLater)
         self._thread.finished.connect(self._thread.deleteLater)
 
-        # When done, notify UI
-        self._worker.finished.connect(self._on_deploy_finished_internal)
+        self._worker.finished.connect(self.deploy_finished)
 
-        # Start execution
-        self._thread.started.connect(self._worker.run, Qt.QueuedConnection)
+        self._thread.started.connect(self._worker.run)
         self._thread.start()
+
+        # IMPORTANT:
+        # The View (MainWindow) is now responsible for threading.
 
     def _on_deploy_finished_internal(self):
         self.deploy_finished.emit()

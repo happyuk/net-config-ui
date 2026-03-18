@@ -89,7 +89,6 @@ class DeployWorker(QObject):
     def run(self):
         try:
             # API session
-            self._log("[DEBUG] Worker started")
             if self.api is None:
                 self.api = RouterAPI(
                     self.host,
@@ -100,7 +99,7 @@ class DeployWorker(QObject):
 
             ssh = self._ensure_ssh_connection()
             deployer = Deployer(self.api, ssh_client=ssh)
-            self._log("\n[Deploy] Running commands...")
+            self._log("\n\n[Deploy] Running commands...\n")
             total = len(self.blocks)
 
             for idx, block in enumerate(self.blocks, start=1):
@@ -127,8 +126,8 @@ class DeployWorker(QObject):
 
                 status = getattr(resp, "status_code", "n/a")
                 status_map = {200: "OK", 204: "No Content"}
-                status_str = f"{status} {status_map.get(status, '')}".strip()
-                self._log(f"Status  : {status_str}")
+                # status_str = f"{status} {status_map.get(status, '')}".strip()
+                # self._log(f"Status  : {status_str}")
 
                 if mode == "restconf":
                     self._log(
@@ -138,7 +137,9 @@ class DeployWorker(QObject):
                         str(block.get("payload", {}))
                     )
 
-                self._log("-" * 60)
+                if getattr(resp, "text", None):
+                    cleaned = resp.text.strip()
+                    self.log.emit(cleaned)
 
                 if getattr(resp, "text", None):
                     cleaned = resp.text.strip()
