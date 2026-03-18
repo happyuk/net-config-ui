@@ -13,6 +13,7 @@ from app.infrastructure.loader import NODE_OBR_ASSIGNMENT
 from app.domain.config_builder import ConfigBuilder
 from app.domain.config_manager import ConfigManager
 from app.services.router_api import RouterAPI
+from app.viewmodel.main_viewmodel import MainViewModel
 
 
 LEFT_FIELDS = [
@@ -43,6 +44,12 @@ class MainWindow(QWidget):
         # ---- services ----
         self.settings = QSettings("QinetiQ", "DVRConfigBuilder")
         self.config_builder = ConfigBuilder()
+
+        self.vm = MainViewModel(
+            config_builder=self.config_builder,
+            config_manager=ConfigManager,
+            template_setter=set_selected_template_set
+        )
         self.api = None
 
         # ---- UI ----
@@ -54,7 +61,7 @@ class MainWindow(QWidget):
         self.init_forms()
         self.init_output()
         self.init_layout()
-        
+ 
 
     # ============================================================
     # UI SETUP
@@ -232,48 +239,30 @@ class MainWindow(QWidget):
     # LOGIC
     # ============================================================
 
-    def on_generate_config(self):
+    def on_generate_config(self):        
         self.save_settings()
         node = self.nodenumber.currentText().strip()
         mode = self.template_mode.currentText()
+        ips = self.vm.get_ips(node)
 
-        # 1. Logic: Get IPs from the Manager
-        ips = ConfigManager.get_grey_ips(node)
         if ips:
             self.grey_dhcp.setText(ips["dhcp"])
             self.grey_router.setText(ips["router"])
             self.grey_router_dhcp_reserved.setText(ips["reserved"])
 
-        # 2. Logic: Handle Template Switching
-        path = ConfigManager.get_template_path(mode)
-        if path:
-            set_selected_template_set(path)
-
-        # 3. Build the config
-        cfg = self.config_builder.build_from_label(
-            mode,
-            node_number=node,
-            domain=self.domain.text().strip(),
-            secret=self.secret.text().strip(),
-            username=self.username.text().strip(),
-            usersecret=self.usersecret.text(),
-            grey_dhcp=self.grey_dhcp.text(),
-            grey_router=self.grey_router.text(),
-            grey_router_dhcp_reserved=self.grey_router_dhcp_reserved.text()
-        )
-
+        self.vm.apply_template(mode)
+        data = self.collect_form_data()
+        cfg = self.vm.build_config(mode, node, data)
         self.output.setPlainText(cfg)
 
     def on_test_restconf_api(self):
         self.output.clear()
         self.save_settings()
 
-        host = self.device_host.text().strip()
-        user = self.device_user.text().strip()
-        pwd = self.device_pass.text().strip()
+        host, user, pwd = self.get_device_credentials()
 
         if not (host and user and pwd):
-            self.output.append("\n[API] Please fill Host/User/Pass to test RESTCONF.")
+            self.log("\n[API] Please fill Host/User/Pass to test RESTCONF.")
             return
 
         try:
@@ -281,18 +270,18 @@ class MainWindow(QWidget):
             self.api = RouterAPI(host, user, pwd, verify_tls=False)
 
             ok, msg = self.api.ping()
-            self.output.append(f"[API] {msg}")
+            self.log(f"[API] {msg}")
 
             # Optional: if you want to also show a tiny JSON sample when reachable
             if ok:
                 r = self.api.get_native_hostname()
-                self.output.append(f"[API] Sample GET native/hostname -> {r.status_code}")
+                self.log(f"[API] Sample GET native/hostname -> {r.status_code}")
                 # To avoid huge paste, only show first 2k chars
                 body = r.text or ""
-                self.output.append(body[:2000] + ("..." if len(body) > 2000 else ""))
+                self.log(body[:2000] + ("..." if len(body) > 2000 else ""))
 
         except Exception as e:
-            self.output.append(f"\n[API] Error: {e}")
+            self.log(f"\n[API] Error: {e}")
 
     def on_deploy_full(self):
         self.save_settings()
@@ -302,7 +291,7 @@ class MainWindow(QWidget):
         pwd  = self.device_pass.text().strip()
 
         if not (host and user and pwd):
-            self.output.append("[Deploy] Missing device host/user/pass.")
+            self.log("[Deploy] Missing device host/user/pass.")
             return
 
         # Extract commands from output text and put into an array
@@ -310,7 +299,7 @@ class MainWindow(QWidget):
         commands = [line.strip() for line in raw_text.splitlines() if line.strip()]
 
         if not commands:
-            self.output.append("[Deploy] No commands in output box.")
+            self.log("[Deploy] No commands in output box.")
             return
 
         # Wrap into a single CLI block
@@ -323,8 +312,8 @@ class MainWindow(QWidget):
         self.deploy_worker = DeployWorker(blocks, host, user, pwd, api=self.api)
         self.deploy_worker.moveToThread(self.deploy_thread)
 
-        self.deploy_worker.log.connect(self.output.append)
-        self.deploy_worker.error.connect(self.output.append)
+        self.deploy_worker.log.connect(self.log)
+        self.deploy_worker.error.connect(self.log)
         self.deploy_worker.finished.connect(self._on_deploy_finished)
 
         self.deploy_thread.started.connect(self.deploy_worker.run)
@@ -335,7 +324,7 @@ class MainWindow(QWidget):
 
     def _on_deploy_finished(self):
         try:
-            self.output.append("\n[Deploy] Done.")
+            self.log("\n[Deploy] Done.")
         finally:
             # Cleanup worker and thread objects
             try:
@@ -360,13 +349,11 @@ class MainWindow(QWidget):
         if not hasattr(self, "output"):
             return
 
-        path = ConfigManager.get_template_path(value)
-        
+        path = self.vm.apply_template(value)
         if path:
-            set_selected_template_set(path)
-            self.output.append(f"[Info] Switched to {value.upper()} template set.")
+            self.log(f"[Info] Switched to {value.upper()} template set.")
         else:
-            self.output.append(f"[Warning] No template path found for: {value}")
+            self.log(f"[Warning] No template path found for: {value}")
 
     def on_copy_output(self):
         """Copies the text from the output box to the system clipboard."""
@@ -378,4 +365,25 @@ class MainWindow(QWidget):
             clipboard.setText(text)
             
             # Optional: provide a small visual hint in the output
-            self.output.append("\n[System] Output copied to clipboard.")
+            self.log("\n[System] Output copied to clipboard.")
+    
+    def log(self, msg: str):
+        self.output.append(msg)
+
+    def get_device_credentials(self):
+        return (
+            self.device_host.text().strip(),
+            self.device_user.text().strip(),
+            self.device_pass.text().strip()
+        )
+    
+    def collect_form_data(self):
+        return {
+            "domain": self.domain.text().strip(),
+            "secret": self.secret.text().strip(),
+            "username": self.username.text().strip(),
+            "usersecret": self.usersecret.text(),
+            "grey_dhcp": self.grey_dhcp.text(),
+            "grey_router": self.grey_router.text(),
+            "grey_router_dhcp_reserved": self.grey_router_dhcp_reserved.text()
+        }
