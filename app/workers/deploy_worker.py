@@ -1,3 +1,5 @@
+import time
+
 from PySide6.QtCore import QObject, Signal, Slot
 from netmiko import ConnectHandler
 import paramiko
@@ -99,16 +101,30 @@ class DeployWorker(QObject):
 
             ssh = self._ensure_ssh_connection()
             deployer = Deployer(self.api, ssh_client=ssh)
-            self._log("\n\n[Deploy] Running commands...\n")
-            total = len(self.blocks)
 
+            self._log("\n\n[Deploy] Running commands...\n")
+
+            # -----------------------------
+            # Build flat command list
+            # -----------------------------
+            command_queue = []
+
+            for block in self.blocks:
+                if block.get("mode") == "cli":
+                    cmds = block.get("commands", [])
+                    command_queue.extend(cmds)
+
+            total = len(command_queue)
+            current = 0
+
+            # -----------------------------
+            # Execute blocks normally
+            # -----------------------------
             for idx, block in enumerate(self.blocks, start=1):
+
                 if self._stop:
                     self._log("\n[Deploy] Cancel requested. Stopping…")
                     break
-
-                if total > 0:
-                    self.progress.emit(int(idx / total * 100))
 
                 name = block.get("name", f"block-{idx}")
                 mode = block.get("mode", "?")
@@ -118,17 +134,33 @@ class DeployWorker(QObject):
 
                 try:
                     blk_name, resp = deployer.deploy_block(block)
+
+                    # -----------------------------------
+                    # If this block contains CLI commands
+                    # update progress per command
+                    # -----------------------------------
+                    if mode == "cli":
+                        cmds = block.get("commands", [])
+
+                        for cmd in cmds:
+                            if self._stop:
+                                break
+                            # time.sleep(0.5)
+
+                            current += 1
+                            if total > 0:
+                                self.progress.emit(int(current / total * 100))
+
+                            # Optional test delay
+                            # time.sleep(0.5)
+
                 except Exception as e:
                     self.error.emit(
-                        f"[Deploy] ({idx}/{total}) ERROR in {name}: {e}"
+                        f"[Deploy] ERROR in {name}: {e}"
                     )
                     continue
 
-                status = getattr(resp, "status_code", "n/a")
-                status_map = {200: "OK", 204: "No Content"}
-                # status_str = f"{status} {status_map.get(status, '')}".strip()
-                # self._log(f"Status  : {status_str}")
-
+                # RESTCONF logging
                 if mode == "restconf":
                     self._log(
                         f"Method  : {block.get('method', 'PATCH')}",
@@ -141,14 +173,7 @@ class DeployWorker(QObject):
                     cleaned = resp.text.strip()
                     self.log.emit(cleaned)
 
-                if getattr(resp, "text", None):
-                    cleaned = resp.text.strip()
-                    self._log(
-                        "── Device Output ───────────────────────────────",
-                        cleaned,
-                        "────────────────────────────────────────────────"
-                    )
-
+            # Ensure completion
             if total > 0:
                 self.progress.emit(100)
 
