@@ -201,6 +201,7 @@ class MainWindow(QWidget):
         self.progressBar = QProgressBar()
         self.progressBar.setRange(0, 100)
         self.progressBar.setValue(0)
+        self.progressBar.hide() 
 
     from PySide6.QtWidgets import QSplitter, QGroupBox
 
@@ -373,10 +374,13 @@ class MainWindow(QWidget):
         self.vm.start_deployment(blocks, host, user, pwd)
 
     def _set_busy(self, busy: bool):
-        # Optional: change cursor and disable controls
         self.setCursor(Qt.WaitCursor if busy else Qt.ArrowCursor)
         for btn in (self.generate, self.test_api, self.deploy_full_btn):
             btn.setEnabled(not busy)
+        if busy:
+            self.progressBar.show()
+        else:
+            self.progressBar.hide()
 
     def on_template_changed(self, value: str):
         """Update the template set whenever the dropdown changes."""
