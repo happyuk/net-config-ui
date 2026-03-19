@@ -1,0 +1,13 @@
+/* Base group box styling */
+QGroupBox {
+    
+    margin-top: 12px;
+}
+
+/* All titles in orange */
+QGroupBox::title {
+    color: #ff9800;      /* orange */
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    padding: 0 4px;
+}

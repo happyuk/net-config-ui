@@ -80,7 +80,6 @@ class Deployer:
             while channel.recv_ready():
                 channel.recv(65535)
             channel.send(cmd + "\n")
-            time.sleep(0.1)
             resp = self._read_until(channel, prompt_regex)
             output_lines.append(f"\n$ {cmd}")
             output_lines.append(resp.strip())        

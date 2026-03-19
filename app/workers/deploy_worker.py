@@ -145,7 +145,6 @@ class DeployWorker(QObject):
                         for cmd in cmds:
                             if self._stop:
                                 break
-                            # time.sleep(0.5)
 
                             current += 1
                             if total > 0:

@@ -212,13 +212,9 @@ class MainWindow(QWidget):
         left_layout.addWidget(form_box)
 
         # ---- Device Credentials ----
-        device_box = QGroupBox("Device Credentials")
+        device_box = QGroupBox("Device Access Credentials")
+        device_box.setObjectName("deviceBox")
         device_layout = QVBoxLayout()
-
-        device_note = QLabel("Credentials required for SSH/NETCONF/RESTCONF")
-        device_note.setStyleSheet("color: orange; font-weight: bold;")
-
-        device_layout.addWidget(device_note)
         device_layout.addLayout(self.device_form)   # <-- THIS is the key line
 
         device_box.setLayout(device_layout)
@@ -227,6 +223,7 @@ class MainWindow(QWidget):
 
         # ---- Actions ----
         actions_box = QGroupBox("Actions")
+        actions_box.setObjectName("actionsBox")
         actions_layout = QVBoxLayout()
 
         actions_layout.addWidget(self.generate)
