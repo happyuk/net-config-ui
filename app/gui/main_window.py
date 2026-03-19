@@ -3,8 +3,7 @@ from PySide6.QtCore import Qt, QSettings
 from PySide6.QtGui import QFont, QColor, QPalette, QTextCursor
 from PySide6.QtWidgets import (
     QGroupBox, QProgressBar, QSplitter, QWidget, QLabel, QLineEdit, QPushButton,
-    QTextEdit, QVBoxLayout, QHBoxLayout,
-    QFormLayout, QComboBox
+    QTextEdit, QVBoxLayout, QFormLayout, QComboBox
 )
 
 from app.domain.config_blocks import set_selected_template_set
@@ -27,7 +26,7 @@ LEFT_FIELDS = [
 DEVICE_FIELDS = [
     ("Host", "device_host", QLineEdit),
     ("Username", "device_user", QLineEdit),
-    ("Password", "device_pass", QLineEdit),
+    ("Password", "device_pass", QLineEdit)
 ]
 
 RIGHT_FIELDS = [
@@ -74,6 +73,7 @@ class MainWindow(QWidget):
     def init_inputs(self):
         """Create all input widgets."""
         self.widgets = {}
+        self.ssh_status_label = QLabel("")
 
         # Create left side widgets
         for label, name, widget_type in LEFT_FIELDS:
@@ -135,19 +135,24 @@ class MainWindow(QWidget):
         self.device_pass.setPlaceholderText("device password")
 
         # Buttons
-        self.generate = QPushButton("Generate config")
+        self.generate = QPushButton("Generate node configuration")
         self.generate.clicked.connect(self.on_generate_config)
 
         self.test_api = QPushButton("Test RESTCONF")
         self.test_api.clicked.connect(self.on_test_restconf_api)
         self.test_api.hide()
 
-        self.deploy_full_btn = QPushButton("Deploy")
+        self.deploy_full_btn = QPushButton("Deploy configuration commands")
         self.deploy_full_btn.clicked.connect(self.on_deploy_full)
 
-        self.copy_btn = QPushButton("Copy Output")
+        self.copy_btn = QPushButton("Copy Output Text")
         self.copy_btn.clicked.connect(self.on_copy_output)
 
+        self.clear_btn = QPushButton("Clear Output Text")
+        self.clear_btn.clicked.connect(self.on_clear_output)
+
+        self.test_ssh_btn = QPushButton("Test Access")
+        self.test_ssh_btn.clicked.connect(self.on_test_ssh)
 
     def init_forms(self):
         """Create separate forms for configuration and device credentials."""
@@ -206,20 +211,19 @@ class MainWindow(QWidget):
         left_panel = QWidget()
         left_layout = QVBoxLayout()
 
+        # ---- Device SSH Credentials ----
+        device_box = QGroupBox("Device Access: SSH")
+        device_box.setObjectName("deviceBox")
+        device_layout = QVBoxLayout()
+        device_layout.addLayout(self.device_form)
+        device_layout.addWidget(self.test_ssh_btn)
+        device_box.setLayout(device_layout)
+        left_layout.addWidget(device_box)
+
         # ---- Configuration ----
         form_box = QGroupBox("Node Configuration")
         form_box.setLayout(self.left_form)
         left_layout.addWidget(form_box)
-
-        # ---- Device Credentials ----
-        device_box = QGroupBox("Device Access Credentials")
-        device_box.setObjectName("deviceBox")
-        device_layout = QVBoxLayout()
-        device_layout.addLayout(self.device_form)   # <-- THIS is the key line
-
-        device_box.setLayout(device_layout)
-
-        left_layout.addWidget(device_box)
 
         # ---- Actions ----
         actions_box = QGroupBox("Actions")
@@ -230,6 +234,7 @@ class MainWindow(QWidget):
         actions_layout.addWidget(self.test_api)
         actions_layout.addWidget(self.deploy_full_btn)
         actions_layout.addWidget(self.copy_btn)
+        actions_layout.addWidget(self.clear_btn)
 
         actions_layout.addStretch()
 
@@ -393,9 +398,28 @@ class MainWindow(QWidget):
             from PySide6.QtGui import QGuiApplication
             clipboard = QGuiApplication.clipboard()
             clipboard.setText(text)
-            
-            # Optional: provide a small visual hint in the output
             self.log("\n[System] Output copied to clipboard.")
+
+    from netmiko import ConnectHandler
+
+    def on_test_ssh(self):
+        self.on_clear_output()
+
+        host, user, pwd = self.get_device_credentials()
+
+        self.log(f"Connecting to {host}...")
+
+        ok, result = self.vm.test_ssh(host, user, pwd)
+
+        if ok:
+            self.log("SSH connection successful")
+            self.log(result[:500])
+        else:
+            self.log(f"SSH connection failed: {result}")
+
+    def on_clear_output(self):
+        """Clear the text from the output box"""
+        self.output.clear()
     
     def log(self, msg: str):
         self.output.moveCursor(QTextCursor.End)

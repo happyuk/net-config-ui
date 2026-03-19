@@ -1,4 +1,6 @@
 from PySide6.QtCore import QObject, Qt, Signal, QThread
+from netmiko import ConnectHandler
+from app.services.ssh_service import SSHService
 from app.workers.deploy_worker import DeployWorker
 from app.services.router_api import RouterAPI
 
@@ -10,6 +12,7 @@ class MainViewModel(QObject):
 
     def __init__(self, config_builder, config_manager, template_setter, worker_factory=None, thread_factory=None):
         super().__init__()
+        self.ssh = SSHService()
         self.config_builder = config_builder
         self.config_manager = config_manager
         self.template_setter = template_setter
@@ -115,7 +118,17 @@ class MainViewModel(QObject):
 
         except Exception as e:
             return False, str(e), None
+
+    def test_ssh(self, host, user, pwd):
+        try:
+            self.ssh.connect(host, user, pwd)
+            output = self.ssh.send_command("show version")
+            return True, output
+
+        except Exception as e:
+            return False, str(e)
     
+
     def start_deployment(self, blocks, host, user, pwd):
         if not blocks:
             self.deploy_error.emit("No deployment blocks.")
