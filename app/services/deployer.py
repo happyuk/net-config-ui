@@ -90,54 +90,40 @@ class Deployer:
 
         return SimpleResp()
 
-    def deploy_via_cli_netmiko(self, commands, log_callback=None): # <-- 1. Added log_callback
+    def deploy_via_cli_netmiko(self, commands, log_callback=None):
         if not self.ssh:
             raise RuntimeError("CLI deployment requested but no SSH client provided")
 
+        # 1. Clean the commands (keep the internal structure)
         if isinstance(commands, str):
             commands = commands.splitlines()
-
-        cleaned_cmds = []
-        is_config = False
-        output_accumulator = [] # <-- 2. Initialize the list here
-
-        for cmd in commands:
-            c = cmd.strip()
-            if not c or c.startswith("!"):
-                continue
-            if c.lower() in ["conf t", "configure terminal"]:
-                is_config = True
-                continue
-            cleaned_cmds.append(c)
+        
+        # We strip whitespace but keep the command exactly as it is in the script
+        cleaned_cmds = [c.strip() for c in commands if c.strip()]
+        output_accumulator = []
 
         try:
-            if is_config:
-                # Use enumerate(..., start=1) to get the command number (i)
-                for i, cmd in enumerate(cleaned_cmds, start=1):
-                    out = self.ssh.send_config_set([cmd]) 
-                    output_accumulator.append(out)
-                    
-                    if log_callback:
-                        # Send the text AND the current command number (i)
-                        log_callback(out, i) 
-                    time.sleep(1.0)
-            else:
-                for i, cmd in enumerate(cleaned_cmds, start=1):
-                    out = self.ssh.send_command(cmd)
-                    output_accumulator.append(out)
-                    
-                    if log_callback:
-                        # Send the text AND the current command number (i)
-                        log_callback(f"$ {cmd}\n{out}", i) 
-                    time.sleep(1.0)
+            for i, cmd in enumerate(cleaned_cmds, start=1):
+                # 2. Treat EVERYTHING as a direct command
+                # This allows 'conf t', 'vrf definition', and 'exit' to work naturally
+                out = self.ssh.send_command(cmd, expect_string=r"[\#\>]")
+                
+                output_accumulator.append(out)
+                
+                if log_callback:
+                    # Provide the feedback to the UI
+                    log_callback(f"$ {cmd}\n{out}\n", i)
+                
+                # Optional pause for testing progress bar visual effect.
+                import time
+                # time.sleep(0.5) 
 
         except Exception as e:
-            error_msg = f"Error: {str(e)}"
+            error_msg = f"Error during command execution: {str(e)}"
             if log_callback:
                 log_callback(error_msg)
             output_accumulator.append(error_msg)
 
-        # 3. Define the return object so the rest of the app doesn't break
         class SimpleResp:
             def __init__(self, text):
                 self.status_code = 200
