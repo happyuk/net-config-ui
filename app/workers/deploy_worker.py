@@ -90,38 +90,33 @@ class DeployWorker(QObject):
     @Slot()
     def run(self):
         try:
-            # API session
+            # 1. Initialize API and SSH
             if self.api is None:
-                self.api = RouterAPI(
-                    self.host,
-                    self.user,
-                    self.pwd,
-                    verify_tls=False
-                )
-
+                self.api = RouterAPI(self.host, self.user, self.pwd, verify_tls=False)
             ssh = self._ensure_ssh_connection()
+            
+            # 2. Create the deployer
             deployer = Deployer(self.api, ssh_client=ssh)
+
+            # 3. Create the callback to bridge progress signals to the Deployer
+            def emit_log_callback(msg, index=None):
+                self.log.emit(msg)
+                if index is not None and total > 0:
+                    # Use index calculated from the deployer to update the progress bar
+                    self.progress.emit(int((index / total) * 100))
 
             self._log("\n\n[Deploy] Running commands...\n")
 
-            # -----------------------------
-            # Build flat command list
-            # -----------------------------
+            # Calculate total number of commands for progress bar
             command_queue = []
-
             for block in self.blocks:
                 if block.get("mode") == "cli":
-                    cmds = block.get("commands", [])
-                    command_queue.extend(cmds)
-
+                    command_queue.extend(block.get("commands", []))
             total = len(command_queue)
             current = 0
 
-            # -----------------------------
-            # Execute blocks normally
-            # -----------------------------
+            # 4. Loop through the blocks
             for idx, block in enumerate(self.blocks, start=1):
-
                 if self._stop:
                     self._log("\n[Deploy] Cancel requested. Stopping…")
                     break
@@ -129,55 +124,33 @@ class DeployWorker(QObject):
                 name = block.get("name", f"block-{idx}")
                 mode = block.get("mode", "?")
 
-                if mode == "cli" and deployer.ssh is None:
-                    deployer.ssh = self._ensure_ssh_connection()
-
                 try:
-                    blk_name, resp = deployer.deploy_block(block)
+                    # Pass the logging callback here. 
+                    # The deployer will call this for EVERY command it sends.
+                    blk_name, resp = deployer.deploy_block(block, log_callback=emit_log_callback)
 
-                    # -----------------------------------
-                    # If this block contains CLI commands
-                    # update progress per command
-                    # -----------------------------------
+                    # Update progress bar
                     if mode == "cli":
                         cmds = block.get("commands", [])
+                        current += len(cmds)
 
-                        for cmd in cmds:
-                            if self._stop:
-                                break
-
-                            current += 1
-                            if total > 0:
-                                self.progress.emit(int(current / total * 100))
-
-                            # Optional test delay
-                            # time.sleep(0.5)
+                        if total > 0:
+                            self.progress.emit(int(current / total * 100))
 
                 except Exception as e:
-                    self.error.emit(
-                        f"[Deploy] ERROR in {name}: {e}"
-                    )
+                    self.error.emit(f"[Deploy] ERROR in {name}: {e}")
                     continue
 
-                # RESTCONF logging
+                # Logging for non-CLI modes (RESTCONF)
                 if mode == "restconf":
-                    self._log(
-                        f"Method  : {block.get('method', 'PATCH')}",
-                        f"Resource: {block.get('resource', '')}",
-                        "Payload :",
-                        str(block.get("payload", {}))
-                    )
+                    self._log(f"Method: {block.get('method', 'PATCH')}", f"Resource: {block.get('resource', '')}")
+                    if getattr(resp, "text", None):
+                        self.log.emit(resp.text.strip())
 
-                if getattr(resp, "text", None):
-                    cleaned = resp.text.strip()
-                    self.log.emit(cleaned)
-
-            # Ensure completion
             if total > 0:
                 self.progress.emit(100)
 
         except Exception as e:
             self.error.emit(f"[Deploy] Fatal error: {e}")
-
         finally:
             self.finished.emit()
