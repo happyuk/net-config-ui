@@ -2,9 +2,11 @@
 from PySide6.QtCore import Qt, QSettings
 from PySide6.QtGui import QFont, QColor, QPalette, QTextCursor
 from PySide6.QtWidgets import (
-    QGroupBox, QProgressBar, QSplitter, QWidget, QLabel, QLineEdit, QPushButton,
+    QGroupBox, QHBoxLayout, QProgressBar, QRadioButton, QSplitter, QWidget, QLabel, QLineEdit, QPushButton,
     QTextEdit, QVBoxLayout, QFormLayout, QComboBox
 )
+import serial
+import serial.tools.list_ports  # Add this line
 
 from app.domain.config_blocks import set_selected_template_set
 from app.infrastructure.loader import NODE_OBR_ASSIGNMENT
@@ -40,28 +42,32 @@ class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
 
-        # ---- services ----
+        # 1. Basics
         self.settings = QSettings("QinetiQ", "DVRConfigBuilder")
         self.config_builder = ConfigBuilder()
 
+        # 2. UI Setup (MUST happen before restore_settings)
         self.init_inputs()
-        self.restore_settings()     # Load saved values AFTER creating widgets
         self.init_forms()
         self.init_output()
-        self.init_layout()
+        self.init_layout() 
 
+        # 3. Viewmodel (Fixing the TypeError)
+        # Note: I'm assuming ConfigManager needs to be instantiated here
         self.vm = MainViewModel(
             config_builder=self.config_builder,
-            config_manager=ConfigManager,
+            config_manager=ConfigManager, 
             template_setter=set_selected_template_set
         )
-        self.api = None
+
+        # 4. Final Wiring & Loading
         self.vm.deploy_log.connect(self.log)
         self.vm.deploy_error.connect(self.log)
         self.vm.deploy_progress.connect(self.progressBar.setValue)
         self.vm.deploy_finished.connect(self.on_deploy_finished)
 
-        # ---- UI ----
+        self.restore_settings() # Now this won't crash on 'ssh_inner_box'
+
         self.setWindowTitle("Router Config Builder")
         self.resize(1000, 650)
 
@@ -74,6 +80,14 @@ class MainWindow(QWidget):
         """Create all input widgets."""
         self.widgets = {}
         self.ssh_status_label = QLabel("")
+
+        # ---- Connection Mode Toggles ----
+        self.radio_serial = QRadioButton("Serial Cable")
+        self.radio_ssh = QRadioButton("SSH")
+        self.radio_ssh.setChecked(True) 
+
+        self.radio_ssh.toggled.connect(self.update_access_ui)
+        self.radio_serial.toggled.connect(self.update_access_ui)
 
         # Create left side widgets
         for label, name, widget_type in LEFT_FIELDS:
@@ -94,6 +108,15 @@ class MainWindow(QWidget):
 
             setattr(self, name, w)
             self.widgets[name] = w
+
+        # ---- Serial Console Widgets ----
+        self.serial_port_combo = QComboBox()
+        self.serial_baud_combo = QComboBox()
+        self.serial_baud_combo.addItems(["9600", "115200", "38400", "57600"])
+        self.refresh_serial_btn = QPushButton("Refresh Ports")
+        self.refresh_serial_btn.clicked.connect(self.on_refresh_serial)
+        self.btn_serial_connect = QPushButton("Connect via Console")
+        self.btn_serial_connect.clicked.connect(self.on_serial_connect)
 
         # Create right side widgets (readonly)
         for label, name in RIGHT_FIELDS:
@@ -154,6 +177,9 @@ class MainWindow(QWidget):
         self.test_ssh_btn = QPushButton("Test Access")
         self.test_ssh_btn.clicked.connect(self.on_test_ssh)
 
+        self.btn_test_connection = QPushButton("Test Connection")
+        self.btn_test_connection.clicked.connect(self.on_handle_test)
+
     def init_forms(self):
         """Create separate forms for configuration and device credentials."""
 
@@ -212,16 +238,47 @@ class MainWindow(QWidget):
         left_panel = QWidget()
         left_layout = QVBoxLayout()
 
-        # ---- Device SSH Credentials ----
-        device_box = QGroupBox("Device Access: SSH")
-        device_box.setObjectName("deviceBox")
-        device_layout = QVBoxLayout()
-        device_layout.addLayout(self.device_form)
-        device_layout.addWidget(self.test_ssh_btn)
-        device_box.setLayout(device_layout)
-        left_layout.addWidget(device_box)
+        # ---- PARENT: Device Access ----
+        self.device_access_box = QGroupBox("Device Access")
+        access_layout = QVBoxLayout()
 
-        # ---- Configuration ----
+        # 1. Mode Selection (Horizontal)
+        mode_layout = QHBoxLayout()
+        mode_layout.addWidget(self.radio_serial)
+        mode_layout.addWidget(self.radio_ssh)
+        mode_layout.addStretch() # Pushes buttons to the left
+        access_layout.addLayout(mode_layout)
+
+        # 2. Inner Box: Serial Settings
+        self.serial_inner_box = QGroupBox("Serial Connection Settings")
+        serial_inner_layout = QVBoxLayout()
+
+        # Helper layout for the Port + Refresh button line
+        port_line = QHBoxLayout()
+        port_line.addWidget(self.serial_port_combo, stretch=4)
+        port_line.addWidget(self.refresh_serial_btn, stretch=1)
+
+        serial_form = QFormLayout()
+        serial_form.addRow("Port:", port_line)
+        serial_form.addRow("Baud:", self.serial_baud_combo)
+        
+        serial_inner_layout.addLayout(serial_form)
+        self.serial_inner_box.setLayout(serial_inner_layout)
+        access_layout.addWidget(self.serial_inner_box)
+
+        # 3. Inner Box: SSH Settings
+        self.ssh_inner_box = QGroupBox("SSH Connection Settings")
+        ssh_inner_layout = QVBoxLayout()
+        ssh_inner_layout.addLayout(self.device_form) # Uses your DEVICE_FIELDS form
+        self.ssh_inner_box.setLayout(ssh_inner_layout)
+        access_layout.addWidget(self.ssh_inner_box)
+
+        # 4. Unified Test Button
+        access_layout.addWidget(self.btn_test_connection)
+        self.device_access_box.setLayout(access_layout)
+        left_layout.addWidget(self.device_access_box)
+
+        # ---- Node Configuration ----
         form_box = QGroupBox("Node Configuration")
         form_box.setLayout(self.left_form)
         left_layout.addWidget(form_box)
@@ -284,6 +341,7 @@ class MainWindow(QWidget):
 
         main_layout.addWidget(splitter)
         self.setLayout(main_layout)
+        self.update_access_ui()
 
 
     # ============================================================
@@ -303,6 +361,13 @@ class MainWindow(QWidget):
         self.domain.setText(s.value("ui/domain", self.domain.text()))
         self.username.setText(s.value("ui/username", self.username.text()))
 
+        # Restore the connection mode
+        mode = s.value("device/access_mode", "ssh") # Default to ssh if not found
+        if mode == "serial":
+            self.radio_serial.setChecked(True)
+        else:
+            self.radio_ssh.setChecked(True)
+
     def save_settings(self):
         """Write settings to disk."""
         s = self.settings
@@ -313,6 +378,13 @@ class MainWindow(QWidget):
         s.setValue("ui/node_number", self.nodenumber.currentText())
         s.setValue("ui/domain", self.domain.text().strip())
         s.setValue("ui/username", self.username.text().strip())
+
+        # Save the connection mode
+        mode = "ssh" if self.radio_ssh.isChecked() else "serial"
+        s.setValue("device/access_mode", mode)
+        
+        # ... your existing ui/domain etc saves ...
+        s.sync() # Force write to disk
 
     # Save when window closes
     def closeEvent(self, event):
@@ -422,8 +494,72 @@ class MainWindow(QWidget):
             self.log(f"SSH connection failed: {result}")
 
     def on_clear_output(self):
-        """Clear the text from the output box"""
         self.output.clear()
+
+    def on_refresh_serial(self):
+            """Manually scan for /dev/ttyUSB* or /dev/ttyACM* ports and log findings."""
+            self.serial_port_combo.clear()
+            
+            # Use a list comprehension to get the full port objects so we can see descriptions
+            ports = [p for p in serial.tools.list_ports.comports() 
+                    if "ttyUSB" in p.device or "ttyACM" in p.device]
+            
+            if not ports:
+                self.serial_port_combo.addItem("No Devices Found")
+                self.btn_serial_connect.setEnabled(False)
+                self.log("[System] Scan complete: No USB serial devices found. Check your cable.")
+            else:
+                # Extract just the device paths for the dropdown
+                device_paths = [p.device for p in ports]
+                self.serial_port_combo.addItems(device_paths)
+                self.btn_serial_connect.setEnabled(True)
+                
+                # Log each found device with its hardware description
+                self.log(f"[System] Scan complete: Found {len(ports)} device(s):")
+                for p in ports:
+                    # Example log: [System] -> /dev/ttyUSB0 (FT232R USB UART)
+                    self.log(f"  -> {p.device} ({p.description})")
+
+    def on_serial_connect(self):
+        port = self.serial_port_combo.currentText()
+        baud = self.serial_baud_combo.currentText()
+        
+        if port == "No Devices Found" or not port:
+            self.log("[Critical] Test Aborted: No valid serial port selected.")
+            return
+
+        self.log(f"[1/3] Opening port {port} at {baud} baud...")
+        
+        try:
+            # We use a short timeout so the UI doesn't hang if the device is dead
+            ser = serial.Serial(port, int(baud), timeout=1)
+            
+            if ser.is_open:
+                self.log(f"[2/3] Port {port} is OPEN and available.")
+                
+                # Test "Liveness": Send a carriage return to see if we get anything back
+                self.log("[3/3] Sending 'Enter' to device to check for response...")
+                ser.write(b'\r\n')
+                
+                # Read a small bit of buffer to see if there's text (like a login prompt)
+                response = ser.read(100).decode('utf-8', errors='ignore')
+                
+                if response:
+                    self.log(f"[Success] Device responded with: {response.strip()}")
+                else:
+                    self.log("[Warning] Port is open, but the device is SILENT.")
+                    self.log("[Tip] Ensure the router is powered on and the cable is seated.")
+                
+                ser.close()
+                self.log(">>> TEST COMPLETE <<<")
+
+        except serial.SerialException as e:
+            self.log(f"[Error] Hardware failure: {str(e)}")
+            if "Permission denied" in str(e):
+                self.log("[Tip] Run: 'sudo usermod -aG dialout $USER' and restart your session.")
+        except Exception as e:
+            self.log(f"[Error] Unexpected failure: {str(e)}")
+
     
     def log(self, msg: str):
         self.output.moveCursor(QTextCursor.End)
@@ -451,3 +587,28 @@ class MainWindow(QWidget):
     def on_deploy_finished(self):
         self._set_busy(False)
         self.log("\n[Deploy] Done.")
+
+    def update_access_ui(self):
+        """Disables the group box not currently in use based on Radio Selection."""
+        is_ssh = self.radio_ssh.isChecked()
+        
+        # This one line disables/enables every widget inside the SSH box
+        self.ssh_inner_box.setEnabled(is_ssh)
+        
+        # This one line disables/enables every widget inside the Serial box
+        self.serial_inner_box.setEnabled(not is_ssh)
+        
+        # Optional: Update the button text so the user knows exactly what it's testing
+        if is_ssh:
+            self.btn_test_connection.setText("Test SSH Connection")
+        else:
+            self.btn_test_connection.setText("Test Serial Connection")
+
+    def on_handle_test(self):
+        self.on_clear_output()
+        if self.radio_ssh.isChecked():
+            self.log("=== STARTING SSH ACCESS TEST ===")
+            self.on_test_ssh()
+        else:
+            self.log("=== STARTING SERIAL CONSOLE TEST ===")
+            self.on_serial_connect()
