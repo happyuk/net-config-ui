@@ -11,7 +11,7 @@ import serial.tools.list_ports  # Add this line
 from app.domain.config_blocks import set_selected_template_set
 from app.infrastructure.loader import NODE_OBR_ASSIGNMENT
 from app.domain.config_builder import ConfigBuilder
-from app.domain.config_manager import ConfigManager
+from app.domain.config_manager import TEMPLATE_REGISTRY, ConfigManager
 from app.services.router_api import RouterAPI
 from app.viewmodel.main_viewmodel import MainViewModel
 
@@ -129,15 +129,8 @@ class MainWindow(QWidget):
             setattr(self, name, w)
             self.widgets[name] = w
 
-        # Populate template dropdown
-        self.template_mode.addItems([
-            "DVR Pre-Cert",
-            "DVR Post-Cert",
-            "OBR Pre-Cert",
-            "OBR Post-Cert",
-            "Show Running Config"
-        ])
 
+        self.template_mode.addItems(list(TEMPLATE_REGISTRY.keys()))
         self.template_mode.currentTextChanged.connect(self.on_template_changed)
 
         # Populate node dropdown
@@ -452,23 +445,45 @@ class MainWindow(QWidget):
             self.log(body)
 
     def on_deploy_full(self):
-        self.save_settings()
-        host, user, pwd = self.get_device_credentials()
+            self.save_settings()
+            config_text = self.output.toPlainText()
 
-        blocks, err = self.vm.prepare_deployment(
-            self.output.toPlainText(),
-            host, user, pwd
-        )
+            if not config_text.strip():
+                self.log("[Error] No configuration generated to deploy.")
+                return
 
-        if err:
-            self.log(f"[Deploy] {err}")
-            return
+            # ---- BRANCH LOGIC BASED ON MODE ----
+            if self.radio_ssh.isChecked():
+                # Existing SSH Logic
+                host, user, pwd = self.get_device_credentials()
+                if not host:
+                    self.log("[Error] Host IP required for SSH deployment.")
+                    return
+                    
+                blocks, err = self.vm.prepare_deployment(config_text, host, user, pwd)
+                if err:
+                    self.log(f"[Deploy] {err}")
+                    return
 
-        self.progressBar.setValue(0)
-        self._set_busy(True)
+                self.progressBar.setValue(0)
+                self._set_busy(True)
+                self.vm.start_deployment(blocks, host, user, pwd)
 
-        # Delegated to ViewModel
-        self.vm.start_deployment(blocks, host, user, pwd)
+            else:
+                # ---- NEW SERIAL LOGIC ----
+                port = self.serial_port_combo.currentText()
+                baud = self.serial_baud_combo.currentText()
+
+                if port == "No Devices Found" or not port:
+                    self.log("[Error] Valid Serial Port required for deployment.")
+                    return
+
+                self.log(f"=== STARTING SERIAL DEPLOYMENT ON {port} ===")
+                self._set_busy(True)
+                self.progressBar.setRange(0, 0) # Pulsing "busy" mode for serial
+                
+                # Here we call the ViewModel's serial deploy (which we should add next)
+                self.vm.start_serial_deployment(port, baud, config_text)                
 
     def _set_busy(self, busy: bool):
         self.setCursor(Qt.WaitCursor if busy else Qt.ArrowCursor)
@@ -615,23 +630,31 @@ class MainWindow(QWidget):
     
     def on_deploy_finished(self):
         self._set_busy(False)
-        self.log("\n[Deploy] Done.")
+        self.progressBar.setRange(0, 100) # Reset from pulsing to normal
+        self.progressBar.setValue(100)
+        self.log("\n[System] Deployment sequence complete.")
 
     def update_access_ui(self):
-        """Disables the group box not currently in use based on Radio Selection."""
+        """Disables the group box not currently in use and updates button labels."""
         is_ssh = self.radio_ssh.isChecked()
         
-        # This one line disables/enables every widget inside the SSH box
+        # Enable/Disable the relevant settings boxes
         self.ssh_inner_box.setEnabled(is_ssh)
-        
-        # This one line disables/enables every widget inside the Serial box
         self.serial_inner_box.setEnabled(not is_ssh)
         
-        # Optional: Update the button text so the user knows exactly what it's testing
+        # Update the Test Button text
+        test_text = "Test SSH Connection" if is_ssh else "Test Serial Connection"
+        self.btn_test_connection.setText(test_text)
+
+        # ---- UPDATE THE DEPLOY BUTTON HERE ----
         if is_ssh:
-            self.btn_test_connection.setText("Test SSH Connection")
+            self.deploy_full_btn.setText("🌐 Deploy via SSH")
+            self.deploy_full_btn.setStyleSheet("") # Reset to default or your CSS
         else:
-            self.btn_test_connection.setText("Test Serial Connection")
+            self.deploy_full_btn.setText("🚀 Deploy via Serial (Day 0)")
+            # Optional: Make it a different color to highlight hardware action
+            self.deploy_full_btn.setStyleSheet("background-color: #2c3e50; color: white; font-weight: bold;")
+
 
     def on_handle_test(self):
         self.on_clear_output()

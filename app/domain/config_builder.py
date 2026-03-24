@@ -3,136 +3,69 @@
 from pathlib import Path
 from typing import Optional, Dict, List
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
+from app.domain.config_manager import TEMPLATE_REGISTRY
 
-# Render the Jinja template into a config. string using the parameters provided from the UI (node, domain, secrets etc)
 class ConfigBuilder:
     """
     Centralised Jinja2 config rendering system.
-
-    Supports:
-      - template lookup by filename
-      - template registry for friendly names
-      - auto-discovery of available templates
-      - error handling for missing templates
+    Now pulls its mappings from ConfigManager's TEMPLATE_REGISTRY.
     """
 
     def __init__(self):
         # templates/ directory
         self.templates_dir = Path(__file__).resolve().parent.parent / "templates"
 
+        # FileSystemLoader can handle subdirectories if we pass it the root
         self.env = Environment(
             loader=FileSystemLoader(self.templates_dir),
             trim_blocks=False,
             lstrip_blocks=False
         )
 
-        # Friendly names -> template filenames
-        # You can freely expand this.
-        self.registry: Dict[str, str] = {
-            "DVR Pre-Cert": "dvr_pre-cert.j2",
-            "DVR Post-Cert": "dvr_post-cert.j2",  
-            "OBR Pre-Cert": "obr_pre-cert.j2",
-            "OBR Post-Cert": "obr_post-cert.j2",
-            "Show Running Config": "test-show-config.j2"
-        }
-
     # -----------------------------------------------------------
     # TEMPLATE MANAGEMENT
     # -----------------------------------------------------------
 
-    def list_templates(self) -> List[str]:
-        """
-        Returns all template filenames (.j2) in the templates directory.
-        Useful for debugging or dynamic dropdown UIs.
-        """
-        if not self.templates_dir.exists():
-            return []
-        return sorted([f.name for f in self.templates_dir.glob("*.j2")])
-
-    def has_template(self, filename: str) -> bool:
-        """Check if a .j2 template file exists."""
-        return (self.templates_dir / filename).exists()
-
-    def resolve_template(self, friendly_name: str) -> Optional[str]:
-        """
-        Convert a UI template label into a Jinja filename via registry.
-        Returns None if not implemented yet.
-        """
-        return self.registry.get(friendly_name)
+    def resolve_template_info(self, friendly_name: str) -> Optional[dict]:
+        """Fetch the path and filename from the central registry."""
+        return TEMPLATE_REGISTRY.get(friendly_name)
 
     # -----------------------------------------------------------
     # RENDERING
     # -----------------------------------------------------------
     def render_template(
         self,
-        template_name: str,
-        node_number: str,
-        domain: str,
-        secret: str,
-        username: str,
-        usersecret: str,
-        grey_dhcp: str,
-        grey_router: str,
-        grey_router_dhcp_reserved: str,
+        relative_path: str,
+        **kwargs
     ) -> str:
-        """
-        Render the specified Jinja template.
-        """
-
         try:
-            tmpl = self.env.get_template(template_name)
+            tmpl = self.env.get_template(relative_path)
+            return tmpl.render(**kwargs)
         except TemplateNotFound:
             return (
-                f"ERROR: Template '{template_name}' not found.\n"
-                f"Expected in: {self.templates_dir}"
+                f"ERROR: Template '{relative_path}' not found.\n"
+                f"Expected in: {self.templates_dir / relative_path}"
             )
-
-        return tmpl.render(
-            node_number=node_number,
-            domain=domain,
-            secret=secret,
-            username=username,
-            usersecret=usersecret,
-            grey_dhcp=grey_dhcp,
-            grey_router=grey_router,
-            grey_router_dhcp_reserved=grey_router_dhcp_reserved
-        )
+        except Exception as e:
+            return f"ERROR during rendering: {str(e)}"
 
     # -----------------------------------------------------------
-    # FRIENDLY WRAPPERS (OPTIONAL)
+    # FRIENDLY WRAPPERS
     # -----------------------------------------------------------
     def build_from_label(
         self,
         friendly_label: str,
-        node_number: str,
-        domain: str,
-        secret: str,
-        username: str,
-        usersecret: str,
-        grey_dhcp: str,
-        grey_router: str,
-        grey_router_dhcp_reserved: str,
+        **kwargs
     ) -> str:
+        # 1. Get info from registry
+        info = self.resolve_template_info(friendly_label)
 
-        filename = self.resolve_template(friendly_label)
+        if not info:
+            return f"Template for '{friendly_label}' not implemented in Registry."
 
-        if filename is None:
-            return f"Template for '{friendly_label}' not implemented yet."
+        # 2. Construct the relative path Jinja needs (e.g., "dvr/precert/dvr_pre-cert.j2")
+        # This handles your subfolder structure!
+        rel_path = f"{info['path']}/{info['file']}"
 
-        if not self.has_template(filename):
-            return (
-                f"Template '{filename}' is expected for '{friendly_label}' "
-                f"but does not exist in {self.templates_dir}"
-            )
-
-        return self.render_template(
-            filename,
-            node_number=node_number,
-            domain=domain,
-            secret=secret,
-            username=username,
-            usersecret=usersecret,
-            grey_dhcp=grey_dhcp,
-            grey_router=grey_router,
-            grey_router_dhcp_reserved=grey_router_dhcp_reserved
-        )
+        # 3. Render
+        return self.render_template(rel_path, **kwargs)
