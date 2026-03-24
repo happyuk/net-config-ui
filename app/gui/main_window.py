@@ -168,7 +168,8 @@ class MainWindow(QWidget):
         self.test_api.clicked.connect(self.on_test_restconf_api)
         self.test_api.hide()
 
-        self.deploy_full_btn = QPushButton("Deploy configuration commands")
+        self.deploy_full_btn = QPushButton("Deploy")
+        self.deploy_full_btn.setObjectName("deployButton")
         self.deploy_full_btn.clicked.connect(self.on_deploy_full)
 
         self.copy_btn = QPushButton("Copy Output Text")
@@ -190,6 +191,7 @@ class MainWindow(QWidget):
         # CONFIGURATION FORM
         # =========================
         self.left_form = QFormLayout()
+        self.left_form.setLabelAlignment(Qt.AlignRight)
 
         for label, name, _ in LEFT_FIELDS:
             self.left_form.addRow(f"{label}:", self.widgets[name])
@@ -198,6 +200,7 @@ class MainWindow(QWidget):
         # DEVICE FORM (NEW)
         # =========================
         self.device_form = QFormLayout()
+        self.device_form.setLabelAlignment(Qt.AlignRight)
 
         for label, name, _ in DEVICE_FIELDS:
             self.device_form.addRow(f"{label}:", self.widgets[name])
@@ -206,6 +209,7 @@ class MainWindow(QWidget):
         # RIGHT FORM
         # =========================
         self.right_form = QFormLayout()
+        self.right_form.setLabelAlignment(Qt.AlignRight)
 
         for label, name in RIGHT_FIELDS:
             self.right_form.addRow(f"{label}:", self.widgets[name])
@@ -241,15 +245,15 @@ class MainWindow(QWidget):
         left_layout = QVBoxLayout()
 
         # ---- PARENT: Device Access ----
-        self.device_access_box = QGroupBox("Device Access")
-        access_layout = QVBoxLayout()
+        self.connection_method_box = QGroupBox("Connection Method")
+        connection_method_layout = QVBoxLayout()
 
         # 1. Mode Selection (Horizontal)
         mode_layout = QHBoxLayout()
         mode_layout.addWidget(self.radio_serial)
         mode_layout.addWidget(self.radio_ssh)
         mode_layout.addStretch() # Pushes buttons to the left
-        access_layout.addLayout(mode_layout)
+        connection_method_layout.addLayout(mode_layout)
 
         # 2. Inner Box: Serial Settings
         self.serial_inner_box = QGroupBox("Serial Connection Settings")
@@ -261,28 +265,32 @@ class MainWindow(QWidget):
         port_line.addWidget(self.refresh_serial_btn, stretch=1)
 
         serial_form = QFormLayout()
+        serial_form.setLabelAlignment(Qt.AlignRight)
         serial_form.addRow("Port:", port_line)
         serial_form.addRow("Baud:", self.serial_baud_combo)
         
         serial_inner_layout.addLayout(serial_form)
         self.serial_inner_box.setLayout(serial_inner_layout)
-        access_layout.addWidget(self.serial_inner_box)
+        connection_method_layout.addWidget(self.serial_inner_box)
 
         # 3. Inner Box: SSH Settings
         self.ssh_inner_box = QGroupBox("SSH Connection Settings")
         ssh_inner_layout = QVBoxLayout()
         ssh_inner_layout.addLayout(self.device_form) # Uses your DEVICE_FIELDS form
         self.ssh_inner_box.setLayout(ssh_inner_layout)
-        access_layout.addWidget(self.ssh_inner_box)
+        connection_method_layout.addWidget(self.ssh_inner_box)
 
         # 4. Unified Test Button
-        access_layout.addWidget(self.btn_test_connection)
-        self.device_access_box.setLayout(access_layout)
-        left_layout.addWidget(self.device_access_box)
+        connection_method_layout.addWidget(self.btn_test_connection)
+        self.connection_method_box.setLayout(connection_method_layout)
+        left_layout.addWidget(self.connection_method_box)
 
         # ---- Node Configuration ----
         form_box = QGroupBox("Node Configuration")
-        form_box.setLayout(self.left_form)
+        form_vbox = QVBoxLayout()
+        form_vbox.addLayout(self.left_form)
+        form_vbox.addWidget(self.generate)
+        form_box.setLayout(form_vbox)
         left_layout.addWidget(form_box)
 
         # ---- Actions ----
@@ -290,12 +298,11 @@ class MainWindow(QWidget):
         actions_box.setObjectName("actionsBox")
         actions_layout = QVBoxLayout()
 
-        actions_layout.addWidget(self.generate)
+        # actions_layout.addWidget(self.generate)
         actions_layout.addWidget(self.test_api)
         actions_layout.addWidget(self.deploy_full_btn)
         actions_layout.addWidget(self.copy_btn)
         actions_layout.addWidget(self.clear_btn)
-
         actions_layout.addStretch()
 
         actions_box.setLayout(actions_layout)
@@ -354,6 +361,18 @@ class MainWindow(QWidget):
         """Load saved user/device settings."""
         s = self.settings
 
+        # Restore Baud Rate
+        saved_baud = s.value("serial/baud", "9600") # Default to 9600 if empty
+        index = self.serial_baud_combo.findText(saved_baud)
+        if index >= 0:
+            self.serial_baud_combo.setCurrentIndex(index)
+
+        # Restore Port
+        saved_port = s.value("serial/port", "")
+        index = self.serial_port_combo.findText(saved_port)
+        if index >= 0:
+            self.serial_port_combo.setCurrentIndex(index)
+
         self.device_host.setText(s.value("device/host", ""))
         self.device_user.setText(s.value("device/user", ""))
         self.device_pass.setText(s.value("device/pass", ""))
@@ -373,9 +392,16 @@ class MainWindow(QWidget):
     def save_settings(self):
         """Write settings to disk."""
         s = self.settings
+        # Existing SSH parameters
         s.setValue("device/host", self.device_host.text().strip())
         s.setValue("device/user", self.device_user.text().strip())
         s.setValue("device/pass", self.device_pass.text().strip())
+
+        # Existing serial parameters
+        s.setValue("serial/port", self.serial_port_combo.currentText())
+        s.setValue("serial/baud", self.serial_baud_combo.currentText())
+
+        # UI and mode parameters
         s.setValue("ui/template_mode", self.template_mode.currentText())
         s.setValue("ui/node_number", self.nodenumber.currentText())
         s.setValue("ui/domain", self.domain.text().strip())
@@ -502,6 +528,7 @@ class MainWindow(QWidget):
     def on_refresh_serial(self):
             """Manually scan for /dev/ttyUSB* or /dev/ttyACM* ports and log findings."""
             self.serial_port_combo.clear()
+            self.on_clear_output()
             
             # Use a list comprehension to get the full port objects so we can see descriptions
             ports = [p for p in serial.tools.list_ports.comports() 

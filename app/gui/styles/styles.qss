@@ -166,3 +166,30 @@ QGroupBox:disabled {
 QGroupBox:disabled::title {
     color: #885500; /* Dimmed orange for disabled titles */
 }
+
+/* Special Styling for the Deploy Button */
+QPushButton#deployButton {
+    background-color: #007acc; /* A distinct blue (like a primary action) */
+    border: 1px solid #005a9e;
+    font-weight: bold;
+    color: white;
+}
+
+QPushButton#deployButton:hover {
+    background-color: #0086e6;
+}
+
+QPushButton#deployButton:pressed {
+    background-color: #ff9800; /* Switches to your theme's orange when pressed */
+    color: black;
+}
+
+/* --- Terminal Output Area --- */
+QTextEdit {
+    background-color: #000000;
+    color: #ffffff;
+    font-family: 'Consolas', 'Monaco', monospace;
+    border: 1px solid #444444;
+    padding: 10px;        /* This creates the breathing room */
+    border-radius: 4px;   /* Softens the edges to match the buttons */
+}
