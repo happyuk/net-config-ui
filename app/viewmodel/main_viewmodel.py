@@ -3,6 +3,7 @@ from netmiko import ConnectHandler
 from app.services.ssh_service import SSHService
 from app.workers.connection_test_worker import ConnectionTestWorker
 from app.workers.deploy_worker import DeployWorker
+from app.workers.serial_worker import SerialDeployWorker
 from app.services.router_api import RouterAPI
 
 class MainViewModel(QObject):
@@ -133,7 +134,6 @@ class MainViewModel(QObject):
             # This catches timeouts, refused connections, or bad auth
             return False, str(e)
     
-
     def start_deployment(self, blocks, host, user, pwd):
         if not blocks:
             self.deploy_error.emit("No deployment blocks.")
@@ -196,3 +196,47 @@ class MainViewModel(QObject):
         self._test_thread.started.connect(self._test_worker.run)
         
         self._test_thread.start()
+
+    def start_serial_deployment(self, port, baud, config):
+        """Orchestrates the serial thread."""
+        # Create the worker instance
+        self.serial_worker = SerialDeployWorker(port, baud, config)
+
+        # Connect signals to the ViewModel's own signals 
+        # (Which are already connected to the MainWindow UI)
+        self.serial_worker.log_signal.connect(self.deploy_log.emit)
+        self.serial_worker.progress_signal.connect(self.deploy_progress.emit)
+        self.serial_worker.finished_signal.connect(self.deploy_finished.emit)
+
+        # Start the background thread
+        self.serial_worker.start()
+
+
+    def start_serial_deployment(self, port: str, baud: str, config: str):
+        """Orchestrates the serial thread with safety checks."""
+        
+        # 1. SAFETY: Prevent overlapping deployments
+        if hasattr(self, 'serial_worker') and self.serial_worker is not None:
+            if self.serial_worker.isRunning():
+                self.deploy_error.emit("[Serial] A deployment is already in progress.")
+                return
+
+        # 2. Initialize the worker
+        # Ensure you have 'from app.workers.serial_worker import SerialDeployWorker' at the top
+        self.serial_worker = SerialDeployWorker(port, baud, config)
+
+        # 3. Connect signals (Wiring the worker to the VM's existing UI-connected signals)
+        self.serial_worker.log_signal.connect(self.deploy_log.emit)
+        self.serial_worker.progress_signal.connect(self.deploy_progress.emit)
+        
+        # 4. Clean up the worker object when it's done to free memory
+        self.serial_worker.finished_signal.connect(self.on_serial_worker_finished)
+        self.serial_worker.finished_signal.connect(self.deploy_finished.emit)
+
+        # 5. Kick off the thread
+        self.serial_worker.start()
+
+    def on_serial_worker_finished(self):
+        """Cleanup after the thread dies."""
+        self.serial_worker.deleteLater()
+        self.serial_worker = None

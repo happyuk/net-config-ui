@@ -85,7 +85,7 @@ class MainWindow(QWidget):
         self.ssh_status_label = QLabel("")
 
         # ---- Connection Mode Toggles ----
-        self.radio_serial = QRadioButton("Serial Cable")
+        self.radio_serial = QRadioButton("Serial Cable (Day 0)")
         self.radio_ssh = QRadioButton("SSH")
         self.radio_ssh.setChecked(True) 
 
@@ -651,7 +651,7 @@ class MainWindow(QWidget):
             self.deploy_full_btn.setText("🌐 Deploy via SSH")
             self.deploy_full_btn.setStyleSheet("") # Reset to default or your CSS
         else:
-            self.deploy_full_btn.setText("🚀 Deploy via Serial (Day 0)")
+            self.deploy_full_btn.setText("🚀 Deploy via Serial Cable (Day 0)")
             # Optional: Make it a different color to highlight hardware action
             self.deploy_full_btn.setStyleSheet("background-color: #2c3e50; color: white; font-weight: bold;")
 
