@@ -110,3 +110,59 @@ QPushButton:hover {
     border: 1px solid #ff9800; /* Glows orange when you're about to click */
     background-color: #444444;
 }
+
+/* --- Horizontal Scrollbar Styling (Matches your Vertical style) --- */
+QScrollBar:horizontal {
+    border: none;
+    background: #1e1e1e; /* Match window background */
+    height: 12px;        /* Matches your vertical width */
+    margin: 0px 0px 0px 0px;
+}
+
+/* The actual draggable handle */
+QScrollBar::handle:horizontal {
+    background: #444444;
+    min-width: 20px;
+    border-radius: 5px;
+    margin: 2px;
+}
+
+/* Handle color when hovering */
+QScrollBar::handle:horizontal:hover {
+    background: #ff9800; /* Orange highlight on hover */
+}
+
+/* Remove the arrow buttons at the left and right */
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    width: 0px;
+}
+
+/* Ensure the background of the track is dark */
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+    background: none;
+}
+
+/* Fixes the tiny white square where the two scrollbars meet */
+QAbstractScrollArea::corner {
+    background: #1e1e1e;
+    border: none;
+}
+
+/* --- Disabled / Greyed Out State --- */
+QWidget:disabled {
+    color: #555555;            /* Darker gray text */
+    background-color: #252525; /* Slightly different background */
+}
+
+QLineEdit:disabled, QComboBox:disabled {
+    border: 1px solid #333333; /* Darker border for disabled inputs */
+    background-color: #222222;
+}
+
+QGroupBox:disabled {
+    border: 1px solid #2a2a2a;
+}
+
+QGroupBox:disabled::title {
+    color: #885500; /* Dimmed orange for disabled titles */
+}

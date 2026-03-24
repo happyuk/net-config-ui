@@ -415,9 +415,7 @@ class MainWindow(QWidget):
 
     def on_test_restconf_api(self):
         self.output.clear()
-
         host, user, pwd = self.get_device_credentials()
-
         ok, msg, extra = self.vm.test_restconf(host, user, pwd)
 
         self.log(f"[API] {msg}")
@@ -429,7 +427,6 @@ class MainWindow(QWidget):
 
     def on_deploy_full(self):
         self.save_settings()
-
         host, user, pwd = self.get_device_credentials()
 
         blocks, err = self.vm.prepare_deployment(
