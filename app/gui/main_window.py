@@ -65,6 +65,7 @@ class MainWindow(QWidget):
         self.vm.deploy_error.connect(self.log)
         self.vm.deploy_progress.connect(self.progressBar.setValue)
         self.vm.deploy_finished.connect(self.on_deploy_finished)
+        self.vm.test_finished.connect(self.handle_test_ssh_result)
 
         self.restore_settings() # Now this won't crash on 'ssh_inner_box'
 
@@ -206,7 +207,6 @@ class MainWindow(QWidget):
 
         for label, name in RIGHT_FIELDS:
             self.right_form.addRow(f"{label}:", self.widgets[name])
-
 
     def init_output(self):
         """Output text area as CLI-style terminal."""
@@ -480,18 +480,11 @@ class MainWindow(QWidget):
 
     def on_test_ssh(self):
         self.on_clear_output()
-
-        host, user, pwd = self.get_device_credentials()
-
-        self.log(f"Connecting to {host}...")
-
-        ok, result = self.vm.test_ssh(host, user, pwd)
-
-        if ok:
-            self.log("SSH connection successful")
-            self.log(result[:500])
-        else:
-            self.log(f"SSH connection failed: {result}")
+        host, user, pwd = self.get_device_credentials() 
+        self.log(f"Testing SSH connection to {host}...")
+        self.setCursor(Qt.WaitCursor)
+        self.btn_test_connection.setEnabled(False) 
+        self.vm.start_ssh_test(host, user, pwd)
 
     def on_clear_output(self):
         self.output.clear()
@@ -559,8 +552,7 @@ class MainWindow(QWidget):
                 self.log("[Tip] Run: 'sudo usermod -aG dialout $USER' and restart your session.")
         except Exception as e:
             self.log(f"[Error] Unexpected failure: {str(e)}")
-
-    
+ 
     def log(self, msg: str):
         self.output.moveCursor(QTextCursor.End)
         self.output.insertPlainText(msg + "\n")
@@ -612,3 +604,13 @@ class MainWindow(QWidget):
         else:
             self.log("=== STARTING SERIAL CONSOLE TEST ===")
             self.on_serial_connect()
+
+    # In app/gui/main_window.py
+    def handle_test_ssh_result(self, ok, result, extra=None):
+        self.setCursor(Qt.ArrowCursor)
+        self.btn_test_connection.setEnabled(True)
+
+        if ok:
+            self.log(f"SUCCESS: {result}")
+        else:
+            self.log(f"FAILURE: {result}")

@@ -1,6 +1,7 @@
 from PySide6.QtCore import QObject, Qt, Signal, QThread
 from netmiko import ConnectHandler
 from app.services.ssh_service import SSHService
+from app.workers.connection_test_worker import ConnectionTestWorker
 from app.workers.deploy_worker import DeployWorker
 from app.services.router_api import RouterAPI
 
@@ -9,6 +10,7 @@ class MainViewModel(QObject):
     deploy_error = Signal(str)
     deploy_progress = Signal(int)
     deploy_finished = Signal()
+    test_finished = Signal(bool, str)
 
     def __init__(self, config_builder, config_manager, template_setter, worker_factory=None, thread_factory=None):
         super().__init__()
@@ -159,3 +161,35 @@ class MainViewModel(QObject):
         self.deploy_finished.emit()
         self._thread = None
         self._worker = None
+
+    def start_connection_test(self, mode, host, user, pwd):
+        # 1. Setup the thread and worker using your existing factories
+        thread = self.thread_factory()
+        worker = ConnectionTestWorker(mode, self, host, user, pwd)
+        worker.moveToThread(thread)
+        # 2. Wire the signals (Assuming you add a 'test_finished' Signal to MainViewModel)
+        worker.finished.connect(self.test_finished) 
+        # 3. Standard cleanup pattern
+        worker.finished.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+
+        thread.started.connect(worker.run)
+        thread.start()
+
+    # In app/viewmodel/main_viewmodel.py
+    def start_ssh_test(self, host, user, pwd):
+        self._test_thread = self.thread_factory()
+        
+        # 5 arguments: mode, vm (self), host, user, pwd
+        self._test_worker = ConnectionTestWorker("ssh", self, host, user, pwd) 
+        self._test_worker.moveToThread(self._test_thread)
+        
+        # Signal connections
+        self._test_worker.finished.connect(self.test_finished) 
+        self._test_worker.finished.connect(self._test_thread.quit)
+        self._test_worker.finished.connect(self._test_worker.deleteLater)
+        self._test_thread.finished.connect(self._test_thread.deleteLater)
+        self._test_thread.started.connect(self._test_worker.run)
+        
+        self._test_thread.start()
