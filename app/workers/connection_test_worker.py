@@ -15,10 +15,7 @@ class ConnectionTestWorker(QObject):
     def run(self):
         try:
             if self.mode == "ssh":
-                # 1. Immediate feedback that the thread actually started
-                self.vm.deploy_log.emit(f"[SSH] Initializing connection to {self.host}...")
-                
-                # 2. Add a timeout to the actual call (e.g., 10 seconds)
+                # Add a timeout to the actual call (e.g., 10 seconds)
                 # Make sure your vm.test_ssh handles a timeout argument
                 ok, result = self.vm.test_ssh(self.host, self.user, self.pwd)
                 

@@ -121,13 +121,16 @@ class MainViewModel(QObject):
         except Exception as e:
             return False, str(e), None
 
+    # app/viewmodel/main_viewmodel.py
     def test_ssh(self, host, user, pwd):
         try:
-            self.ssh.connect(host, user, pwd)
+            # We attempt to connect. 
+            # Suggestion: check if your SSHService.connect accepts a timeout parameter
+            self.ssh.connect(host, user, pwd) 
             output = self.ssh.send_command("show version")
             return True, output
-
         except Exception as e:
+            # This catches timeouts, refused connections, or bad auth
             return False, str(e)
     
 

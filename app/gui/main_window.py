@@ -1,5 +1,5 @@
 # app/gui/main_window.py
-from PySide6.QtCore import Qt, QSettings
+from PySide6.QtCore import QTimer, Qt, QSettings
 from PySide6.QtGui import QFont, QColor, QPalette, QTextCursor
 from PySide6.QtWidgets import (
     QGroupBox, QHBoxLayout, QProgressBar, QRadioButton, QSplitter, QWidget, QLabel, QLineEdit, QPushButton,
@@ -45,15 +45,18 @@ class MainWindow(QWidget):
         # 1. Basics
         self.settings = QSettings("QinetiQ", "DVRConfigBuilder")
         self.config_builder = ConfigBuilder()
+        self.timer = QTimer()
+        self.timer.setInterval(1000) # Update every second
+        self.timer.timeout.connect(self.update_timer_label)
+        self.seconds_elapsed = 0
 
         # 2. UI Setup (MUST happen before restore_settings)
         self.init_inputs()
         self.init_forms()
         self.init_output()
         self.init_layout() 
-
-        # 3. Viewmodel (Fixing the TypeError)
-        # Note: I'm assuming ConfigManager needs to be instantiated here
+        
+        # 3. Viewmodel
         self.vm = MainViewModel(
             config_builder=self.config_builder,
             config_manager=ConfigManager, 
@@ -67,8 +70,7 @@ class MainWindow(QWidget):
         self.vm.deploy_finished.connect(self.on_deploy_finished)
         self.vm.test_finished.connect(self.handle_test_ssh_result)
 
-        self.restore_settings() # Now this won't crash on 'ssh_inner_box'
-
+        self.restore_settings()
         self.setWindowTitle("Router Config Builder")
         self.resize(1000, 650)
 
@@ -480,10 +482,21 @@ class MainWindow(QWidget):
 
     def on_test_ssh(self):
         self.on_clear_output()
-        host, user, pwd = self.get_device_credentials() 
+        host, user, pwd = self.get_device_credentials()
+        if not host:
+            self.log("[Error] Host IP is required for SSH test.")
+            return
+        self.seconds_elapsed = 0        
+        self.output.setReadOnly(True) # Lock the output box
         self.log(f"Testing SSH connection to {host}...")
+        
+        # Setup the timer line
+        self.output.insertPlainText(f"[SSH] Initializing connection to {host}...\n")
+        self.output.insertPlainText("Still attempting connection... (0s elapsed)")
+        self.timer.start(1000)
+
         self.setCursor(Qt.WaitCursor)
-        self.btn_test_connection.setEnabled(False) 
+        self.btn_test_connection.setEnabled(False)
         self.vm.start_ssh_test(host, user, pwd)
 
     def on_clear_output(self):
@@ -605,12 +618,35 @@ class MainWindow(QWidget):
             self.log("=== STARTING SERIAL CONSOLE TEST ===")
             self.on_serial_connect()
 
-    # In app/gui/main_window.py
     def handle_test_ssh_result(self, ok, result, extra=None):
+        self.timer.stop()
+        
+        # Ubnlock the output box
+        self.output.setReadOnly(False) 
+
         self.setCursor(Qt.ArrowCursor)
         self.btn_test_connection.setEnabled(True)
 
+        # Force newline after the timer line
+        cursor = self.output.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        cursor.insertText("\n") 
+        self.output.setTextCursor(cursor)
+
         if ok:
-            self.log(f"SUCCESS: {result}")
+            self.log(f"SUCCESS: Connection established.")
         else:
             self.log(f"FAILURE: {result}")
+
+
+    def update_timer_label(self):
+        self.seconds_elapsed += 1
+        cursor = self.output.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        
+        # Select only the current line
+        cursor.movePosition(QTextCursor.StartOfLine, QTextCursor.KeepAnchor)
+        
+        # Replace the text
+        cursor.insertText(f"Still attempting connection... ({self.seconds_elapsed}s elapsed)")
+        self.output.setTextCursor(cursor)
