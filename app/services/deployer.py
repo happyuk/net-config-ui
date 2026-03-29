@@ -94,29 +94,49 @@ class Deployer:
         if not self.ssh:
             raise RuntimeError("CLI deployment requested but no SSH client provided")
 
-        # 1. Clean the commands (keep the internal structure)
+        # 1. Clean the commands
         if isinstance(commands, str):
             commands = commands.splitlines()
         
-        # We strip whitespace but keep the command exactly as it is in the script
         cleaned_cmds = [c.strip() for c in commands if c.strip()]
         output_accumulator = []
 
         try:
+            # --- ELEVATION CHECK ---
+            # This uses the 'secret' in your connection dictionary to handle the 'Password:' prompt
+            if not self.ssh.check_enable_mode():
+                self.log_signal.emit("[Serial] Elevating to Privileged EXEC mode...")
+                self.ssh.enable()
+
+            # TELL THE ROUTER NOT TO PAUSE (Critical for 'show version')
+            self.ssh.send_command("terminal length 0")
+
             for i, cmd in enumerate(cleaned_cmds, start=1):
-                # 2. Treat EVERYTHING as a direct command
-                # This allows 'conf t', 'vrf definition', and 'exit' to work naturally
-                out = self.ssh.send_command(cmd, expect_string=r"[\#\>]")
+                # --- NEW: DYNAMIC PROMPT HANDLING ---
+                # Use send_command_timing for destructive commands like 'write erase'
+                # because they trigger a confirmation prompt before the '#' returns.
+                if any(x in cmd.lower() for x in ["write erase", "reload", "delete"]):
+                    out = self.ssh.send_command_timing(
+                        cmd, 
+                        strip_prompt=False, 
+                        strip_command=False
+                    )
+                    # If the router asks [confirm], send a newline to say "Yes"
+                    if "confirm" in out.lower() or "continue" in out.lower():
+                        out += self.ssh.send_command_timing("\n")
+                else:
+                    # Standard command execution
+                    out = self.ssh.send_command(
+                        cmd, 
+                        expect_string=r"(\#|\>|confirm|yes\/no|proceed|bits|modulus)",
+                        read_timeout=300,
+                        delay_factor=2
+                    )
                 
                 output_accumulator.append(out)
                 
                 if log_callback:
-                    # Provide the feedback to the UI
                     log_callback(f"$ {cmd}\n{out}\n", i)
-                
-                # Optional pause for testing progress bar visual effect.
-                import time
-                # time.sleep(0.5) 
 
         except Exception as e:
             error_msg = f"Error during command execution: {str(e)}"
