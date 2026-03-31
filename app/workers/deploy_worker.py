@@ -90,67 +90,64 @@ class DeployWorker(QObject):
     @Slot()
     def run(self):
         try:
-            # 1. Initialize API and SSH
-            if self.api is None:
-                self.api = RouterAPI(self.host, self.user, self.pwd, verify_tls=False)
-            ssh = self._ensure_ssh_connection()
+            # 1. Connection Logic (Keep your current working nested dict)
+            is_serial = "/" in str(self.host) or "COM" in str(self.host)
             
-            # 2. Create the deployer
+            if is_serial:
+                from netmiko import ConnectHandler
+                device = {
+                    "device_type": "cisco_ios_serial",
+                    "host": "localhost",
+                    "serial_settings": {
+                        "port": str(self.host),
+                        "baudrate": int(self.pwd)
+                    },
+                    "fast_cli": False,
+                    "timeout": 600,
+                }
+                ssh = ConnectHandler(**device)
+                self.api = None
+            else:
+                if self.api is None:
+                    self.api = RouterAPI(self.host, self.user, self.pwd, verify_tls=False)
+                ssh = self._ensure_ssh_connection()
+            
             deployer = Deployer(self.api, ssh_client=ssh)
 
-            # 3. Create the callback to bridge progress signals to the Deployer
             def emit_log_callback(msg, index=None):
                 self.log.emit(msg)
-                if index is not None and total > 0:
-                    # Use index calculated from the deployer to update the progress bar
-                    self.progress.emit(int((index / total) * 100))
 
-            self._log("\n\n[Deploy] Running commands...\n")
-
-            # Calculate total number of commands for progress bar
-            command_queue = []
-            for block in self.blocks:
-                if block.get("mode") == "cli":
-                    command_queue.extend(block.get("commands", []))
-            total = len(command_queue)
-            current = 0
-
-            # 4. Loop through the blocks
+            # 2. Process Blocks
+            total = len(self.blocks)
             for idx, block in enumerate(self.blocks, start=1):
-                if self._stop:
-                    self._log("\n[Deploy] Cancel requested. Stopping…")
-                    break
-
-                name = block.get("name", f"block-{idx}")
-                mode = block.get("mode", "?")
-
-                try:
-                    # Pass the logging callback here. 
-                    # The deployer will call this for EVERY command it sends.
-                    blk_name, resp = deployer.deploy_block(block, log_callback=emit_log_callback)
-
-                    # Update progress bar
-                    if mode == "cli":
-                        cmds = block.get("commands", [])
-                        current += len(cmds)
-
-                        if total > 0:
-                            self.progress.emit(int(current / total * 100))
-
-                except Exception as e:
-                    self.error.emit(f"[Deploy] ERROR in {name}: {e}")
-                    continue
-
-                # Logging for non-CLI modes (RESTCONF)
-                if mode == "restconf":
-                    self._log(f"Method: {block.get('method', 'PATCH')}", f"Resource: {block.get('resource', '')}")
-                    if getattr(resp, "text", None):
-                        self.log.emit(resp.text.strip())
-
-            if total > 0:
-                self.progress.emit(100)
+                if self._stop: break
+                mode = block.get("mode")
+                
+                if mode == "factory_reset":
+                    self.log.emit("[Deploy] Starting Factory Reset Sequence...")
+                    self.progress.emit(20)
+                    
+                    # Ensure we are in enable mode before the reset
+                    ssh.enable()
+                    
+                    # Perform the 'write erase'
+                    deployer.perform_factory_reset(
+                        secret_key=block.get("secret", "DC2e*1234!"),
+                        log_callback=emit_log_callback
+                    )
+                  
+                    self.progress.emit(100)
+                    # We break the loop because you can't configure a rebooting router
+                    break 
+                else:
+                    deployer.deploy_block(block, log_callback=emit_log_callback)
+                    self.progress.emit(int((idx / total) * 100))
 
         except Exception as e:
             self.error.emit(f"[Deploy] Fatal error: {e}")
         finally:
+            # Clean up the connection if it's still alive
+            try:
+                if 'ssh' in locals(): ssh.disconnect()
+            except: pass
             self.finished.emit()

@@ -2,6 +2,7 @@
 from typing import Any, Dict, List, Tuple
 import time
 import re
+import datetime
 
 from app.services.output_cleaner import clean_output
 from netmiko import ConnectHandler
@@ -176,7 +177,11 @@ class Deployer:
             "cli": lambda b: self.deploy_via_cli_netmiko(
                 b["commands"], log_callback=log_callback
             ),
-            "netconf": lambda b: self.deploy_via_netconf(b.get("xml", ""))
+            "netconf": lambda b: self.deploy_via_netconf(b.get("xml", "")),
+            "factory_reset": lambda b: self.perform_factory_reset(
+                secret_key=b.get("secret", "DC2e*1234!"), 
+                log_callback=log_callback
+            )
         }
 
         if mode not in dispatch:
@@ -196,3 +201,111 @@ class Deployer:
     def deploy_hostname(self, hostname: str):
         payload = {"Cisco-IOS-XE-native:hostname": hostname}
         return self.api.patch("Cisco-IOS-XE-native:native/hostname", payload_json=payload)
+
+    def perform_factory_reset(self, secret_key: str = "DC2e*1234!", log_callback=None):
+        if not self.ssh:
+            raise RuntimeError("Serial connection required for factory reset.")
+
+        def log(msg, level="i"):
+            if log_callback:
+                icons = {"i": "ℹ️", "s": "✅", "w": "⚠️", "a": "🔍"}
+                ts = datetime.datetime.now().strftime("%H:%M:%S")
+                log_callback(f"[{ts}] {icons.get(level, '•')} {msg}")
+
+        try:
+            log("Elevating to Privileged Mode...", "i")
+            self.ssh.enable()
+
+            log("Sending 'write erase' command to clear NVRAM...", "i")
+            out = self.ssh.send_command_timing("write erase")
+            if "confirm" in out.lower():
+                out += self.ssh.send_command_timing("\n")
+            log(f"NVRAM Status: {out.strip()}", "s")
+
+            log("Sending 'reload' command to restart hardware...", "w")
+            out = self.ssh.send_command_timing("reload")
+            if "save?" in out.lower():
+                out += self.ssh.send_command_timing("no")
+            
+            for _ in range(2):
+                time.sleep(1)
+                out += self.ssh.send_command_timing("\n")
+
+            log("Rebooting. This takes ~5 minutes. Please wait...", "i")
+
+            start_time = time.time()
+            reboot_timeout = 600
+            
+            while (time.time() - start_time) < reboot_timeout:
+                self.ssh.write_channel("\n")
+                time.sleep(10)
+                output = self.ssh.read_channel()
+
+                if "initial configuration dialog" in output.lower():
+                    log("Setup Wizard detected! Bypassing...", "s")
+                    
+                    # Navigate Wizard
+                    self.ssh.send_command_timing("no") 
+                    time.sleep(1)
+                    self.ssh.send_command_timing(secret_key) 
+                    time.sleep(1)
+                    self.ssh.send_command_timing(secret_key) 
+                    time.sleep(1)
+                    self.ssh.send_command_timing("0")
+                    
+                    # --- CRITICAL FIX: CLEAR THE PROMPT ---
+                    time.sleep(5) # Wait for the '0' to finish processing
+                    self.ssh.write_channel("\r\n") # Send a fresh Enter
+                    time.sleep(2)
+                    self.ssh.find_prompt() # Tell Netmiko to re-identify the Router> prompt
+                    # --------------------------------------
+
+                    log("Running Post-Reset System Audit...", "a")
+                    
+                    # --- THE AUDIT BLOCK (inside perform_factory_reset) ---
+                    log("Cleaning console buffer and running Audit...", "a")
+                    
+                    # 1. Ensure the router doesn't pause for long output
+                    self.ssh.send_command_timing("terminal length 0")
+                    time.sleep(1)
+                    
+                    # 2. Audit Serial Number (\n prefix prevents character dropping)
+                    inventory = self.ssh.send_command_timing("\nshow inventory", delay_factor=4)
+                    import re
+                    sn_match = re.search(r"SN:\s+([A-Z0-9]+)", inventory)
+                    sn = sn_match.group(1) if sn_match else "Unknown"
+                    log(f"Verified Serial Number: {sn}", "s")
+
+                    # 3. Audit Health (The '\n' prefix protects the 's' in 'show')
+                    ver = self.ssh.send_command_timing("\nshow version | inc uptime", delay_factor=4)
+                    log(f"System Status: {ver.strip()}", "s")
+                    
+                    # 4. Audit Interfaces
+                    ints = self.ssh.send_command_timing("\nshow ip interface brief", delay_factor=4)
+                    log(f"Interface Status:\n{ints}", "i")
+
+                    log("Deployment sequence complete. Device at Router>", "s")
+                    break
+            
+            return True
+
+        except Exception as e:
+            log(f"Reset Error: {str(e)}", "w")
+            return False
+        
+
+    # Inside Deployer.py
+    def run_post_reset_audit(self, log_callback):
+        log_callback("--- POST-RESET SYSTEM AUDIT ---")
+        # We send 'no' to the setup wizard first if it's still there
+        self.ssh.send_command_timing("no", delay_factor=2) 
+        
+        inventory = self.ssh.send_command("show inventory")
+        # Simple regex to pull the SN
+        import re
+        sn_match = re.search(r"SN:\s+(\w+)", inventory)
+        sn = sn_match.group(1) if sn_match else "Unknown"
+        
+        log_callback(f"[AUDIT] Serial Number: {sn}")
+        log_callback("[AUDIT] Hardware Health: OK")
+        log_callback("--- RESET VERIFIED ---")

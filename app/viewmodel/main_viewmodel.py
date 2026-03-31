@@ -12,6 +12,7 @@ class MainViewModel(QObject):
     deploy_progress = Signal(int)
     deploy_finished = Signal()
     test_finished = Signal(bool, str)
+    log_signal = Signal(str)
 
     def __init__(self, config_builder, config_manager, template_setter, worker_factory=None, thread_factory=None):
         super().__init__()
@@ -240,3 +241,46 @@ class MainViewModel(QObject):
         """Cleanup after the thread dies."""
         self.serial_worker.deleteLater()
         self.serial_worker = None
+
+
+    def start_factory_reset(self, port: str, baud: str, secret: str):
+        """
+        Initiates the background thread for the factory reset sequence via Serial.
+        """
+        # 1. Create the specific block for the factory reset
+        reset_block = {
+            "name": "Full Factory Reset & Setup Bypass",
+            "mode": "factory_reset",
+            "secret": secret
+        }
+
+        # 2. Initialize the Worker
+        # We pass: 
+        #   host = port (e.g., /dev/ttyUSB0)
+        #   user = "console" (placeholder)
+        #   pwd = baud (e.g., 9600) -> The worker will use this as the baudrate
+        self.worker = DeployWorker(
+            blocks=[reset_block], 
+            host=port, 
+            user="console", 
+            pwd=baud
+        )
+
+        # 3. Connect signals so the UI updates
+        self.worker.log.connect(self.deploy_log.emit)
+        self.worker.error.connect(self.deploy_error.emit)
+        self.worker.progress.connect(self.deploy_progress.emit)
+        self.worker.finished.connect(self.deploy_finished.emit)
+
+        # 4. Start the background thread
+        from PySide6.QtCore import QThread
+        self.thread = QThread()
+        self.worker.moveToThread(self.thread)
+        self.thread.started.connect(self.worker.run)
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        
+        self.thread.start()
+        
+        self.log_signal.emit(f"[Serial] Starting Reset Thread on {port}...")
