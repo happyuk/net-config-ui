@@ -1,4 +1,6 @@
 # app/gui/main_window.py
+import time
+
 from PySide6.QtCore import QTimer, Qt, QSettings
 from PySide6.QtGui import QFont, QColor, QPalette, QTextCursor, QGuiApplication
 from PySide6.QtWidgets import (
@@ -564,9 +566,15 @@ class MainWindow(QWidget):
                 self.log(f"[2/3] Port {port} is OPEN.")
                 self.log("[3/3] Waking up terminal: send carriage return...")
                 ser.write(b'\r\n')
-                response = ser.read(100).decode('utf-8', errors='ignore')
+                
+                time.sleep(2)
+                bytes_to_read = ser.in_waiting if ser.in_waiting > 0 else 2000
+                response = ser.read(bytes_to_read).decode('utf-8', errors='ignore')
+
                 if response.strip():
-                    self.log(f"[Success] Device responded: {response.strip()}")
+                    # Clean up the output for the log window
+                    clean_response = response.strip().replace('\r', '')
+                    self.log(f"[Success] Device responded:\n{clean_response}")
                 else:
                     self.log("[Warning] Port open but device is silent.")
                 ser.close()

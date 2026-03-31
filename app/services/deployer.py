@@ -213,26 +213,37 @@ class Deployer:
                 log_callback(f"[{ts}] {icons.get(level, '•')} {msg}")
 
         try:
+            # 1. ELEVATION
             log("Elevating to Privileged Mode...", "i")
             self.ssh.enable()
+            current_prompt = self.ssh.find_prompt()
+            log(f"Current Prompt: {current_prompt}", "i")
 
+            # 2. ERASE NVRAM
             log("Sending 'write erase' command to clear NVRAM...", "i")
+            # Send command and catch the [confirm] prompt
             out = self.ssh.send_command_timing("write erase")
             if "confirm" in out.lower():
                 out += self.ssh.send_command_timing("\n")
             log(f"NVRAM Status: {out.strip()}", "s")
 
+            # 3. RELOAD
             log("Sending 'reload' command to restart hardware...", "w")
             out = self.ssh.send_command_timing("reload")
+            
+            # Handle "Save?" prompt if configuration was modified
             if "save?" in out.lower():
+                log("Detected Save Prompt -> Sending 'no'", "i")
                 out += self.ssh.send_command_timing("no")
             
+            # Send final confirmation enters for the reload
             for _ in range(2):
                 time.sleep(1)
-                out += self.ssh.send_command_timing("\n")
+                self.ssh.send_command_timing("\n")
 
             log("Rebooting. This takes ~5 minutes. Please wait...", "i")
 
+            # 4. WAIT FOR REBOOT & BYPASS WIZARD
             start_time = time.time()
             reboot_timeout = 600
             
@@ -244,7 +255,7 @@ class Deployer:
                 if "initial configuration dialog" in output.lower():
                     log("Setup Wizard detected! Bypassing...", "s")
                     
-                    # Navigate Wizard
+                    # Navigate Wizard (No, Secret, Secret, 0)
                     self.ssh.send_command_timing("no") 
                     time.sleep(1)
                     self.ssh.send_command_timing(secret_key) 
@@ -253,34 +264,29 @@ class Deployer:
                     time.sleep(1)
                     self.ssh.send_command_timing("0")
                     
-                    # --- CRITICAL FIX: CLEAR THE PROMPT ---
-                    time.sleep(5) # Wait for the '0' to finish processing
-                    self.ssh.write_channel("\r\n") # Send a fresh Enter
+                    # Wait for the '0' selection to process and clear the prompt
+                    time.sleep(5) 
+                    self.ssh.write_channel("\r\n") 
                     time.sleep(2)
-                    self.ssh.find_prompt() # Tell Netmiko to re-identify the Router> prompt
-                    # --------------------------------------
+                    self.ssh.find_prompt() 
 
+                    # 5. POST-RESET AUDIT
                     log("Running Post-Reset System Audit...", "a")
-                    
-                    # --- THE AUDIT BLOCK (inside perform_factory_reset) ---
-                    log("Cleaning console buffer and running Audit...", "a")
-                    
-                    # 1. Ensure the router doesn't pause for long output
                     self.ssh.send_command_timing("terminal length 0")
                     time.sleep(1)
                     
-                    # 2. Audit Serial Number (\n prefix prevents character dropping)
+                    # Audit Serial Number
                     inventory = self.ssh.send_command_timing("\nshow inventory", delay_factor=4)
                     import re
                     sn_match = re.search(r"SN:\s+([A-Z0-9]+)", inventory)
                     sn = sn_match.group(1) if sn_match else "Unknown"
                     log(f"Verified Serial Number: {sn}", "s")
 
-                    # 3. Audit Health (The '\n' prefix protects the 's' in 'show')
+                    # Audit Uptime
                     ver = self.ssh.send_command_timing("\nshow version | inc uptime", delay_factor=4)
                     log(f"System Status: {ver.strip()}", "s")
                     
-                    # 4. Audit Interfaces
+                    # Audit Interfaces
                     ints = self.ssh.send_command_timing("\nshow ip interface brief", delay_factor=4)
                     log(f"Interface Status:\n{ints}", "i")
 
@@ -292,7 +298,7 @@ class Deployer:
         except Exception as e:
             log(f"Reset Error: {str(e)}", "w")
             return False
-        
+            
 
     # Inside Deployer.py
     def run_post_reset_audit(self, log_callback):

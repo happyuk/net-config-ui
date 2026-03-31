@@ -102,6 +102,9 @@ class DeployWorker(QObject):
                         "port": str(self.host),
                         "baudrate": int(self.pwd)
                     },
+                    "username": "admin",
+                    "password": "DC2e*1234!",
+                    "secret": "DC2e*1234!",
                     "fast_cli": False,
                     "timeout": 600,
                 }
