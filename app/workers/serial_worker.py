@@ -172,7 +172,7 @@ class SerialDeployWorker(QThread):
                 else:
                     # --- READ OUTPUT for normal commands ---
                     output = self.wait_for_prompt(ser, timeout=15)
-                    self.log_signal.emit(f"[DEBUG LEN] {len(output)}")
+                    # self.log_signal.emit(f"[DEBUG LEN] {len(output)}")
                     if "%" in output:
                         self.log_signal.emit(f"[Router Error] {output.strip()}")
                     else:

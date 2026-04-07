@@ -1,44 +1,40 @@
-# app/services/config_builder.py
-
+import os
+import sys
 from pathlib import Path
-from typing import Optional, Dict, List
+from typing import Optional
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 from app.domain.config_manager import TEMPLATE_REGISTRY
 
+def get_resource_path(relative_path: str) -> Path:
+    """ 
+    Finds the correct path for files whether running as a script or EXE.
+    """
+    if hasattr(sys, '_MEIPASS'):
+        # If running as EXE, look in the PyInstaller temp folder
+        return Path(sys._MEIPASS) / relative_path
+    
+    # If running as a normal script, look relative to this file
+    # (Go up two levels from app/services/ to the root, then into the folder)
+    return Path(__file__).resolve().parent.parent / relative_path
+
 class ConfigBuilder:
-    """
-    Centralised Jinja2 config rendering system.
-    Now pulls its mappings from ConfigManager's TEMPLATE_REGISTRY.
-    """
-
     def __init__(self):
-        # templates/ directory
-        self.templates_dir = Path(__file__).resolve().parent.parent / "templates"
+        # FIX: Use the helper function to find the templates folder
+        self.templates_dir = get_resource_path("templates")
 
-        # FileSystemLoader can handle subdirectories if we pass it the root
+        # Initialize Jinja2 using the absolute path we just found
         self.env = Environment(
-            loader=FileSystemLoader(self.templates_dir),
+            loader=FileSystemLoader(str(self.templates_dir)),
             trim_blocks=False,
             lstrip_blocks=False
         )
 
-    # -----------------------------------------------------------
-    # TEMPLATE MANAGEMENT
-    # -----------------------------------------------------------
-
     def resolve_template_info(self, friendly_name: str) -> Optional[dict]:
-        """Fetch the path and filename from the central registry."""
         return TEMPLATE_REGISTRY.get(friendly_name)
 
-    # -----------------------------------------------------------
-    # RENDERING
-    # -----------------------------------------------------------
-    def render_template(
-        self,
-        relative_path: str,
-        **kwargs
-    ) -> str:
+    def render_template(self, relative_path: str, **kwargs) -> str:
         try:
+            # Jinja needs the path relative to the FileSystemLoader root
             tmpl = self.env.get_template(relative_path)
             return tmpl.render(**kwargs)
         except TemplateNotFound:
@@ -49,23 +45,15 @@ class ConfigBuilder:
         except Exception as e:
             return f"ERROR during rendering: {str(e)}"
 
-    # -----------------------------------------------------------
-    # FRIENDLY WRAPPERS
-    # -----------------------------------------------------------
-    def build_from_label(
-        self,
-        friendly_label: str,
-        **kwargs
-    ) -> str:
-        # 1. Get info from registry
+    def build_from_label(self, friendly_label: str, **kwargs) -> str:
         info = self.resolve_template_info(friendly_label)
-
         if not info:
             return f"Template for '{friendly_label}' not implemented in Registry."
 
-        # 2. Construct the relative path Jinja needs (e.g., "dvr/precert/dvr_pre-cert.j2")
-        # This handles your subfolder structure!
-        rel_path = f"{info['path']}/{info['file']}"
+        # Logic to handle both root files and subfolder files
+        if info['path']:
+            rel_path = f"{info['path']}/{info['file']}"
+        else:
+            rel_path = info['file']
 
-        # 3. Render
         return self.render_template(rel_path, **kwargs)

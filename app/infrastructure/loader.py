@@ -1,15 +1,13 @@
-import json
+import sys
 import os
-
-DATA_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-    "data"
-)
+import json
 
 def load_json(filename):
-    path = os.path.join(DATA_DIR, filename)
+    # Use _MEIPASS if running in PyInstaller
+    base_path = getattr(sys, "_MEIPASS", os.path.abspath("."))
+    path = os.path.join(base_path, "data", filename)
     with open(path, "r") as f:
         return json.load(f)
 
-# Load Node OBR assignment data
+# Keep your constant exactly as it was
 NODE_OBR_ASSIGNMENT = load_json("node_obr_assignment.json")
