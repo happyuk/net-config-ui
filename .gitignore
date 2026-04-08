@@ -80,6 +80,10 @@ crash_dumps/
 
 .vscode/
 .vscode/*        # workspace settings
+!.vscode/tasks.json
+.vscode/settings.json
+.vscode/launch.json
+.vscode/extensions.json
 .idea/
 *.code-workspace
 
@@ -115,3 +119,10 @@ coverage/
 htmlcov/
 .cache/
 pytest_cache/
+
+
+##############################
+# DEPLOYMENT PACKAGES
+##############################
+*.tar.gz
+deploy_staging/
